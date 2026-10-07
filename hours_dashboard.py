@@ -28,11 +28,12 @@ import re
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+from urllib.parse import urljoin
 from zoneinfo import ZoneInfo
 
 import requests
 
-VERSION = "2026-10-07 hours v3 (90 days)"
+VERSION = "2026-10-07 hours v4 (90 days)"
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "hours_template.html"
 CONFIG_PATH = HERE / "config.ini"
@@ -149,6 +150,8 @@ def fetch_all(cfg, first_response):
         nxt = data.get("next_page_url")
         if not nxt:
             break
+        # AppFolio sends the next page as a path ("/api/v2/..."), so add the site address.
+        nxt = urljoin(f"https://{cfg['subdomain']}.appfolio.com/", nxt)
         r = requests.get(nxt, auth=(cfg["client_id"], cfg["client_secret"]), timeout=180)
         check(r)
     log.info("AppFolio returned %s labor entries (%s pages)", len(rows), page)
