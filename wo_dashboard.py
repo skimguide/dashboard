@@ -31,7 +31,11 @@ HERE = Path(__file__).resolve().parent
 CONFIG_PATH = HERE / "config.ini"
 TEMPLATE_PATH = HERE / "dashboard_template.html"
 
-# A work order counts as open unless its status starts with Completed, Cancel(ed) or Closed.
+# The dashboard shows only these statuses. Anything else AppFolio sends
+# (Work Done, Ready to Bill, Completed, Canceled, ...) is left out.
+SHOW_STATUSES = {s.lower() for s in [
+    "New", "Estimate Requested", "Estimated", "Assigned", "Scheduled", "Waiting",
+]}
 
 # Each dashboard column -> AppFolio field names to try, in order. Run --inspect once
 # and adjust these if your report uses different names.
@@ -160,7 +164,7 @@ def normalize(raw):
     for rec in raw:
         row = {col: pick(rec, names) for col, names in FIELD_MAP.items()}
         row = {k: ("" if v is None else str(v)) for k, v in row.items()}
-        if not row["STATUS"] or re.match(r"(completed|cancel|closed)", row["STATUS"], re.I):
+        if row["STATUS"].strip().lower() not in SHOW_STATUSES:
             continue
         row["DESCRIPTION"] = redact(row["DESCRIPTION"])
         row["CREATED"] = to_date(row["CREATED"])
