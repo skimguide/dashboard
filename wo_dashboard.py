@@ -86,6 +86,13 @@ def fetch_work_orders(cfg):
     url = f"https://{cfg['subdomain']}.appfolio.com/api/v2/reports/{cfg['report']}.json"
     auth = (cfg["client_id"], cfg["client_secret"])
     body = {"paginate_results": True}
+    extra = os.environ.get("APPFOLIO_FILTERS", "").strip()
+    if extra:
+        try:
+            body.update(json.loads(extra))
+        except json.JSONDecodeError:
+            raise SystemExit(f"APPFOLIO_FILTERS isn't valid JSON: {extra}")
+        log.info("Extra report filters: %s", extra)
     rows, page = [], 0
     while url:
         page += 1
@@ -93,7 +100,8 @@ def fetch_work_orders(cfg):
              else requests.get(url, auth=auth, timeout=120))
         if r.status_code == 401:
             raise SystemExit("AppFolio rejected the API credentials (401). Check client_id/client_secret in config.ini.")
-        r.raise_for_status()
+        if r.status_code >= 400:
+            raise SystemExit(f"AppFolio returned {r.status_code}: {r.text[:500]}")
         data = r.json()
         if isinstance(data, list):          # unpaginated response
             rows.extend(data)
