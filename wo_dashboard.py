@@ -31,11 +31,17 @@ HERE = Path(__file__).resolve().parent
 CONFIG_PATH = HERE / "config.ini"
 TEMPLATE_PATH = HERE / "dashboard_template.html"
 
-# The dashboard shows only these statuses. Anything else AppFolio sends
-# (Work Done, Ready to Bill, Completed, Canceled, ...) is left out.
-SHOW_STATUSES = {s.lower() for s in [
-    "New", "Estimate Requested", "Estimated", "Assigned", "Scheduled", "Waiting",
-]}
+# AppFolio's code for each status (from the Work Order report's Status filter).
+# The dashboard pulls and shows only these.
+STATUS_CODES = {
+    "0": "New",
+    "1": "Estimate Requested",
+    "2": "Estimated",
+    "9": "Assigned",
+    "3": "Scheduled",
+    "6": "Waiting",
+}
+SHOW_STATUSES = {name.lower() for name in STATUS_CODES.values()}
 
 # Each dashboard column -> AppFolio field names to try, in order. Run --inspect once
 # and adjust these if your report uses different names.
@@ -86,24 +92,18 @@ def load_config():
     }
 
 
-def fetch_work_orders(cfg):
+def fetch_report(cfg, filters):
+    """One report request, following pagination."""
     url = f"https://{cfg['subdomain']}.appfolio.com/api/v2/reports/{cfg['report']}.json"
     auth = (cfg["client_id"], cfg["client_secret"])
-    body = {"paginate_results": True}
-    extra = os.environ.get("APPFOLIO_FILTERS", "").strip()
-    if extra:
-        try:
-            body.update(json.loads(extra))
-        except json.JSONDecodeError:
-            raise SystemExit(f"APPFOLIO_FILTERS isn't valid JSON: {extra}")
-        log.info("Extra report filters: %s", extra)
+    body = {"paginate_results": True, **filters}
     rows, page = [], 0
     while url:
         page += 1
         r = (requests.post(url, json=body, auth=auth, timeout=120) if page == 1
              else requests.get(url, auth=auth, timeout=120))
         if r.status_code == 401:
-            raise SystemExit("AppFolio rejected the API credentials (401). Check client_id/client_secret in config.ini.")
+            raise SystemExit("AppFolio rejected the API credentials (401). Check the APPFOLIO_CLIENT_ID / APPFOLIO_CLIENT_SECRET secrets.")
         if r.status_code >= 400:
             raise SystemExit(f"AppFolio returned {r.status_code}: {r.text[:500]}")
         data = r.json()
@@ -112,8 +112,31 @@ def fetch_work_orders(cfg):
             break
         rows.extend(data.get("results", []))
         url = data.get("next_page_url")
-        log.info("page %s: %s rows so far", page, len(rows))
     return rows
+
+
+def fetch_work_orders(cfg):
+    """AppFolio's API only honors one status code per request, so ask once per status and combine."""
+    extra = {}
+    raw_extra = os.environ.get("APPFOLIO_FILTERS", "").strip()
+    if raw_extra:
+        try:
+            extra = json.loads(raw_extra)
+        except json.JSONDecodeError:
+            raise SystemExit(f"APPFOLIO_FILTERS isn't valid JSON: {raw_extra}")
+        extra.pop("work_order_statuses", None)   # statuses are handled below
+        if extra:
+            log.info("Extra report filters: %s", extra)
+    combined, seen = [], set()
+    for code, name in STATUS_CODES.items():
+        part = fetch_report(cfg, {**extra, "work_order_statuses": code})
+        log.info("%s: %s work orders", name, len(part))
+        for rec in part:
+            key = pick(rec, ID_FIELDS["work_order_id"]) or pick(rec, FIELD_MAP["WORK ORDER"]) or id(rec)
+            if key not in seen:
+                seen.add(key)
+                combined.append(rec)
+    return combined
 
 
 def pick(rec, names):
