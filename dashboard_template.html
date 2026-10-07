@@ -325,7 +325,7 @@ let qt;$("q").addEventListener("input",e=>{clearTimeout(qt);qt=setTimeout(()=>{F
 /* ---------- snapshot ---------- */
 rows=toRows(SNAP.csv);
 const asOf=new Date(SNAP.asOf+"T12:00:00");
-$("fresh").textContent=`Pulled from AppFolio ${asOf.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}. Updates each morning.`;
+$("fresh").textContent=`Pulled from AppFolio ${SNAP.pulledAt?SNAP.pulledAt+" Pacific":asOf.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}. Updates hourly during business hours.`;
 render();
 })();
 </script>

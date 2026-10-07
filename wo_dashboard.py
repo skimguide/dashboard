@@ -214,13 +214,13 @@ def normalize(raw):
 
 
 # ---------------------------------------------------------------- output
-def build_html(rows, as_of):
+def build_html(rows, as_of, pulled_at=""):
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
     w.writerow(COLUMNS)
     for r in rows:
         w.writerow([r[c] for c in COLUMNS])
-    snap = json.dumps({"asOf": as_of, "csv": buf.getvalue()}).replace("</", "<\\/")
+    snap = json.dumps({"asOf": as_of, "pulledAt": pulled_at, "csv": buf.getvalue()}).replace("</", "<\\/")
     return TEMPLATE_PATH.read_text(encoding="utf-8").replace("__SNAPSHOT__", snap, 1)
 
 
@@ -233,7 +233,7 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.StreamHandler()])
-    log.info("wo_dashboard.py version 2026-10-07b (date range fix)")
+    log.info("wo_dashboard.py version 2026-10-07c (hourly)")
     cfg = load_config()
     raw = fetch_work_orders(cfg)
     log.info("AppFolio returned %s work orders", len(raw))
@@ -260,10 +260,12 @@ def main():
     if not rows:
         # Don't overwrite yesterday's dashboard with an empty one.
         raise SystemExit("No open work orders found. Run with --inspect to check field names and statuses. The live dashboard was not changed.")
-    as_of = datetime.now(ZoneInfo("America/Los_Angeles")).date().isoformat()
+    now = datetime.now(ZoneInfo("America/Los_Angeles"))
+    as_of = now.date().isoformat()
+    pulled_at = now.strftime("%a %b %d, %I:%M %p").replace(" 0", " ")
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "index.html").write_text(build_html(rows, as_of), encoding="utf-8")
+    (out / "index.html").write_text(build_html(rows, as_of, pulled_at), encoding="utf-8")
     (out / "robots.txt").write_text("User-agent: *\nDisallow: /\n", encoding="utf-8")
     log.info("Wrote %s open work orders to %s", len(rows), out / "index.html")
 
