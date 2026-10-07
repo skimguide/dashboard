@@ -127,9 +127,11 @@ def fetch_work_orders(cfg):
         extra.pop("work_order_statuses", None)   # statuses are handled below
         if extra:
             log.info("Extra report filters: %s", extra)
+    # Without status_date "all", AppFolio only returns work orders created in the last 90 days.
+    base = {"status_date": "all", **extra}
     combined, seen = [], set()
     for code, name in STATUS_CODES.items():
-        part = fetch_report(cfg, {**extra, "work_order_statuses": code})
+        part = fetch_report(cfg, {**base, "work_order_statuses": code})
         log.info("%s: %s work orders", name, len(part))
         for rec in part:
             key = pick(rec, ID_FIELDS["work_order_id"]) or pick(rec, FIELD_MAP["WORK ORDER"]) or id(rec)
@@ -227,6 +229,9 @@ def main():
     raw = fetch_work_orders(cfg)
     log.info("AppFolio returned %s work orders", len(raw))
     log.info("Statuses from AppFolio: %s", sorted({str(pick(r, FIELD_MAP["STATUS"])) for r in raw}))
+    created = sorted(to_date(pick(r, FIELD_MAP["CREATED"])) for r in raw if pick(r, FIELD_MAP["CREATED"]))
+    if created:
+        log.info("Oldest work order created: %s", created[0])
 
     if a.inspect:
         # Field names and statuses only. No values, so nothing personal lands in the Actions log.
