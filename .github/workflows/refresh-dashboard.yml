@@ -2,8 +2,8 @@ name: Refresh work orders dashboard
 
 on:
   schedule:
-    # 13:00 UTC = 6:00 AM Pacific in summer, 5:00 AM in winter
-    - cron: "0 13 * * *"
+    # Every hour at :17 past, 6 AM to 7 PM Pacific (13:00-02:00 UTC; shifts an hour in winter)
+   - cron: "17 13-23,0-2 * * *"
   workflow_dispatch:
     inputs:
       inspect:
