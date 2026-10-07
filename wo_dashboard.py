@@ -31,7 +31,7 @@ HERE = Path(__file__).resolve().parent
 CONFIG_PATH = HERE / "config.ini"
 TEMPLATE_PATH = HERE / "dashboard_template.html"
 
-OPEN_STATUSES = {"New", "Estimate Requested", "Estimated", "Assigned", "Scheduled", "Waiting", "Work Done"}
+# A work order counts as open unless its status starts with Completed, Cancel(ed) or Closed.
 
 # Each dashboard column -> AppFolio field names to try, in order. Run --inspect once
 # and adjust these if your report uses different names.
@@ -152,7 +152,7 @@ def normalize(raw):
     for rec in raw:
         row = {col: pick(rec, names) for col, names in FIELD_MAP.items()}
         row = {k: ("" if v is None else str(v)) for k, v in row.items()}
-        if row["STATUS"] not in OPEN_STATUSES:
+        if not row["STATUS"] or re.match(r"(completed|cancel|closed)", row["STATUS"], re.I):
             continue
         row["DESCRIPTION"] = redact(row["DESCRIPTION"])
         row["CREATED"] = to_date(row["CREATED"])
@@ -191,6 +191,7 @@ def main():
     cfg = load_config()
     raw = fetch_work_orders(cfg)
     log.info("AppFolio returned %s work orders", len(raw))
+    log.info("Statuses from AppFolio: %s", sorted({str(pick(r, FIELD_MAP["STATUS"])) for r in raw}))
 
     if a.inspect:
         # Field names and statuses only. No values, so nothing personal lands in the Actions log.

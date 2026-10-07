@@ -66,6 +66,15 @@ h1 .count{color:var(--steel)}
 .chip[aria-pressed="true"]{background:var(--steel);border-color:var(--steel);color:var(--panel)}
 .chip.urg[aria-pressed="true"]{background:var(--urgent);border-color:var(--urgent)}
 .shown{padding:8px 12px;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.active{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--hover);font-size:13px}
+.active .lbl{font-weight:600;margin-right:2px}
+.active .none{font-style:normal}
+.tag{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 6px 3px 11px;cursor:pointer;font-size:13px}
+.tag:hover{border-color:var(--urgent)}
+.tag .x{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--line);font-size:12px;line-height:1}
+.tag:hover .x{background:var(--urgent);color:#fff}
+.clearall{margin-left:auto;border:1px solid var(--steel);background:var(--steel);color:var(--panel);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:13px;font-weight:600}
+.clearall:hover{filter:brightness(1.1)}
 .linkish{background:none;border:0;padding:0;color:var(--steel);cursor:pointer;text-decoration:underline;font-size:13px}
 .tablewrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:14px}
@@ -130,7 +139,8 @@ tr.open .desc{white-space:pre-wrap;color:var(--ink)}
         <select id="fType" aria-label="Type"><option value="">All types</option></select>
       </div>
       <div class="chips" id="chips" role="group" aria-label="Status"></div>
-      <div class="shown"><span id="shown"></span><button class="linkish" id="clear" hidden>Clear filters</button></div>
+      <div class="active" id="active" aria-live="polite"></div>
+      <div class="shown"><span id="shown"></span></div>
       <div class="tablewrap" id="tableWrap"></div>
     </main>
 
@@ -249,7 +259,7 @@ function render(){
     if(k==="pri"){const o={Urgent:0,Normal:1,Low:2};return ((o[x]??3)-(o[y]??3))*d}
     return String(x).localeCompare(String(y),undefined,{numeric:true})*d});
   $("shown").textContent=active()?`Showing ${vis.length} of ${rows.length}`:`Showing all ${rows.length}`;
-  $("clear").hidden=!active();
+  renderActive();
   if(!vis.length){$("tableWrap").innerHTML=`<div class="empty">No work orders match these filters.</div>`;return}
   const cols=[["wo","Work order"],["prop","Property / unit"],["status","Status"],["tech","Assigned to"],["pri","Priority"],["type","Type",1],["created","Created",1],["days","Days open"],["desc","Description"]];
   const link=r=>r.path&&base?`<a href="${esc(base.replace(/\/$/,"")+r.path)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(r.wo)}</a>`:esc(r.wo);
@@ -265,6 +275,19 @@ function render(){
       <td class="hide-sm">${esc(r.created)}</td>
       <td class="days ${dc}">${r.days??""}</td>
       <td><div class="desc">${esc(r.desc)}</div></td></tr>`}).join("")+`</tbody></table>`;
+}
+function renderActive(){
+  const tags=[];
+  if(F.q)tags.push(["q","",`Search: “${F.q}”`]);
+  if(F.urgent)tags.push(["urgent","","Urgent only"]);
+  F.status.forEach(s=>tags.push(["status",s,`Status: ${s}`]));
+  if(F.band){const b=BANDS.find(x=>x.k===F.band);tags.push(["band","",`Open ${b?b.label.replace(" days",""):F.band} days`])}
+  if(F.prop)tags.push(["prop","",`Property: ${F.prop}`]);
+  if(F.tech)tags.push(["tech","",`Tech: ${F.tech==="__none"?"Unassigned":F.tech}`]);
+  if(F.type)tags.push(["type","",`Type: ${F.type}`]);
+  $("active").innerHTML=`<span class="lbl">Filters:</span>`+(tags.length
+    ?tags.map(([k,v,l])=>`<button class="tag" data-remove="${k}" data-val="${esc(v)}" title="Remove this filter">${esc(l)}<span class="x" aria-hidden="true">✕</span></button>`).join("")+`<button class="clearall" id="clear">Clear all filters</button>`
+    :`<span class="none">None. Showing every open work order.</span>`);
 }
 function fill(id,vals,cur,all,extra=[]){
   const el=$(id);const opts=[["",all]].concat(extra,vals.map(v=>[v,v]));
@@ -286,6 +309,10 @@ document.addEventListener("click",e=>{
   else if(t.dataset.tech!==undefined){F.tech=F.tech===t.dataset.tech?"":t.dataset.tech}
   else if(t.dataset.sort){const k=t.dataset.sort;sort=sort.key===k?{key:k,dir:-sort.dir}:{key:k,dir:k==="days"?-1:1}}
   else if(t.matches("tr.row")){t.classList.toggle("open");return}
+  else if(t.dataset.remove){const k=t.dataset.remove;
+    if(k==="status")F.status=F.status.filter(x=>x!==t.dataset.val);
+    else if(k==="urgent")F.urgent=false;
+    else{F[k]="";if(k==="q")$("q").value=""}}
   else if(t.id==="clear"){F={q:"",prop:"",tech:"",type:"",status:[],band:"",urgent:false};$("q").value=""}
   else return;
   save();render();
