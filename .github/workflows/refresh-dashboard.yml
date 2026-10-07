@@ -1,0 +1,62 @@
+name: Refresh work orders dashboard
+
+on:
+  schedule:
+    # 13:00 UTC = 6:00 AM Pacific in summer, 5:00 AM in winter
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+    inputs:
+      inspect:
+        description: "Only list the fields AppFolio returns (no publish)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      APPFOLIO_CLIENT_ID: ${{ secrets.APPFOLIO_CLIENT_ID }}
+      APPFOLIO_CLIENT_SECRET: ${{ secrets.APPFOLIO_CLIENT_SECRET }}
+      APPFOLIO_SUBDOMAIN: guidemanagement
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Inspect AppFolio fields
+        if: ${{ inputs.inspect }}
+        run: python wo_dashboard.py --inspect
+
+      - name: Build dashboard
+        if: ${{ !inputs.inspect }}
+        run: python wo_dashboard.py --out _site
+
+      - uses: actions/upload-pages-artifact@v3
+        if: ${{ !inputs.inspect }}
+        with:
+          path: _site
+
+  deploy:
+    if: ${{ !inputs.inspect }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
