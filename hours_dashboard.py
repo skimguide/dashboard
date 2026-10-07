@@ -28,12 +28,12 @@ import re
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 from zoneinfo import ZoneInfo
 
 import requests
 
-VERSION = "2026-10-07 hours v4 (90 days)"
+VERSION = "2026-10-07 hours v5 (90 days)"
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "hours_template.html"
 CONFIG_PATH = HERE / "config.ini"
@@ -138,7 +138,31 @@ def find_report(cfg, filters):
     )
 
 
+def next_page_urls(cfg, current_url, nxt):
+    """AppFolio's next_page_url may be a full address or a partial one. List the ways to read it, most likely first."""
+    if nxt.startswith("http"):
+        return [nxt]
+    root = f"https://{cfg['subdomain']}.appfolio.com/"
+    tail = nxt.lstrip("/")
+    tries = [urljoin(current_url, nxt), urljoin(root, nxt), root + "api/v2/" + tail, root + "api/" + tail]
+    if tail.startswith("v2/"):
+        tries.insert(0, root + "api/" + tail)
+    out = []
+    for u in tries:
+        if u not in out:
+            out.append(u)
+    return out
+
+
+def shown(url):
+    """A URL's path for the log, without its query values."""
+    p = urlsplit(url)
+    keys = [kv.split("=")[0] for kv in p.query.split("&") if kv]
+    return p.path + ("?" + "&".join(k + "=..." for k in keys) if keys else "")
+
+
 def fetch_all(cfg, first_response):
+    auth = (cfg["client_id"], cfg["client_secret"])
     rows, r, page = [], first_response, 0
     while True:
         page += 1
@@ -150,10 +174,19 @@ def fetch_all(cfg, first_response):
         nxt = data.get("next_page_url")
         if not nxt:
             break
-        # AppFolio sends the next page as a path ("/api/v2/..."), so add the site address.
-        nxt = urljoin(f"https://{cfg['subdomain']}.appfolio.com/", nxt)
-        r = requests.get(nxt, auth=(cfg["client_id"], cfg["client_secret"]), timeout=180)
-        check(r)
+        if page == 1:
+            log.info("Page 1: %s entries. AppFolio's next page link looks like: %s", len(rows), shown(nxt) if not nxt.startswith("http") else shown(nxt) + " (full address)")
+        for url in next_page_urls(cfg, r.url, nxt):
+            attempt = requests.get(url, auth=auth, timeout=180)
+            if attempt.status_code != 404:
+                check(attempt)
+                if page == 1:
+                    log.info("Reading further pages from %s", shown(url))
+                r = attempt
+                break
+            log.info("Next page not found at %s", shown(url))
+        else:
+            raise SystemExit("AppFolio's next-page link didn't work in any form tried above. Send these log lines to get it fixed.")
     log.info("AppFolio returned %s labor entries (%s pages)", len(rows), page)
     return rows
 
