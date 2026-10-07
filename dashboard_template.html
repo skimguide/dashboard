@@ -93,6 +93,11 @@ tr.open .desc{white-space:pre-wrap;color:var(--ink)}
 .st{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;white-space:nowrap;background:var(--hover)}
 .st.Waiting{color:var(--wait)}.st.New{color:var(--new)}.st.Work-Done{color:var(--ok)}.st.Scheduled{color:var(--ok)}
 .pri-Urgent{color:var(--urgent);font-weight:600}
+.fu{white-space:nowrap;font-size:13px}
+.fu.over{color:var(--urgent);font-weight:600}
+.fu.today{color:var(--wait);font-weight:600}
+.fu.unset{color:var(--muted)}
+.chips .glabel{font-size:13px;color:var(--muted);font-weight:600;align-self:center;margin-right:2px}
 .days{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:17px;text-align:right;white-space:nowrap}
 .d3{color:var(--a3)}.d2{color:var(--a2)}
 .none{color:var(--muted);font-style:italic}
@@ -139,6 +144,7 @@ tr.open .desc{white-space:pre-wrap;color:var(--ink)}
         <select id="fType" aria-label="Type"><option value="">All types</option></select>
       </div>
       <div class="chips" id="chips" role="group" aria-label="Status"></div>
+      <div class="chips" id="fuChips" role="group" aria-label="Follow-up"></div>
       <div class="active" id="active" aria-live="polite"></div>
       <div class="shown"><span id="shown"></span></div>
       <div class="tablewrap" id="tableWrap"></div>
@@ -169,7 +175,7 @@ const $=id=>document.getElementById(id);
 const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 
 let rows=[];
-let F=Object.assign({q:"",prop:"",tech:"",type:"",status:[],band:"",urgent:false},store.get("wo.filters",{}));
+let F=Object.assign({q:"",prop:"",tech:"",type:"",status:[],band:"",urgent:false,fu:""},store.get("wo.filters",{}));
 let sort=store.get("wo.sort",{key:"days",dir:-1});
 const base="https://guidemanagement.appfolio.com";
 
@@ -195,7 +201,7 @@ function toRows(text){
     if(/^\d{4}-\d{2}-\d{2}/.test(created)){const [y,mo,d]=created.slice(0,10).split("-").map(Number);days=Math.max(0,Math.round((today-new Date(y,mo-1,d))/DAY))}
     return {wo:m?m[1]:woRaw,path:m?m[2]:"",prop:g("PROPERTY"),unit:g("UNIT").replace(/\s+/g," "),pri:g("PRIORITY"),type:g("TYPE"),
       desc:g("DESCRIPTION").replace(/\n\s*\n+/g,"\n").trim(),status:g("STATUS"),vendor:g("VENDOR"),created:created.slice(0,10),
-      tech:g("ASSIGNED TO"),sched:g("SCHEDULED START").slice(0,10),days};
+      tech:g("ASSIGNED TO"),sched:g("SCHEDULED START").slice(0,10),fu:g("NEXT FOLLOWUP").slice(0,10),days};
   });
 }
 function extract(result){
@@ -207,7 +213,13 @@ function extract(result){
 
 /* ---------- filtering ---------- */
 const bandOf=d=>d==null?null:BANDS.find(b=>d>=b.lo&&d<=b.hi);
+const FU_LABEL={overdue:"Overdue",today:"Due today",upcoming:"Upcoming",none:"Not set"};
+function localISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+const TODAY=localISO();
+function fuState(r){if(!/^\d{4}-\d{2}-\d{2}$/.test(r.fu))return "none";return r.fu<TODAY?"overdue":r.fu===TODAY?"today":"upcoming"}
+function fuText(r){const s=fuState(r);if(s==="none")return "Not set";const [y,m,d]=r.fu.split("-").map(Number);const ds=new Date(y,m-1,d).toLocaleDateString(undefined,{month:"short",day:"numeric"});return s==="overdue"?`Overdue · ${ds}`:s==="today"?"Today":ds}
 function match(r,skip){
+  if(skip!=="fu"&&F.fu&&fuState(r)!==F.fu)return false;
   if(skip!=="status"&&F.status.length&&!F.status.includes(r.status))return false;
   if(skip!=="prop"&&F.prop&&r.prop!==F.prop)return false;
   if(skip!=="tech"&&F.tech&&(F.tech==="__none"?r.tech!=="":r.tech!==F.tech))return false;
@@ -219,7 +231,7 @@ function match(r,skip){
 }
 const countBy=(arr,fn)=>{const m=new Map();arr.forEach(r=>{const k=fn(r);m.set(k,(m.get(k)||0)+1)});return m};
 function save(){store.set("wo.filters",F);store.set("wo.sort",sort)}
-const active=()=>F.q||F.prop||F.tech||F.type||F.status.length||F.band||F.urgent;
+const active=()=>F.q||F.prop||F.tech||F.type||F.status.length||F.band||F.urgent||F.fu;
 
 /* ---------- render ---------- */
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
@@ -242,6 +254,10 @@ function render(){
   $("chips").innerHTML=`<button class="chip urg" data-urgent aria-pressed="${F.urgent}">Urgent <b>${urg}</b></button>`+
     sts.filter(s=>sc.get(s)||F.status.includes(s)).map(s=>`<button class="chip" data-status="${esc(s)}" aria-pressed="${F.status.includes(s)}">${esc(s)} <b>${sc.get(s)||0}</b></button>`).join("");
 
+  // follow-up chips
+  const fc=countBy(rows.filter(r=>match(r,"fu")),fuState);
+  $("fuChips").innerHTML=`<span class="glabel">Follow-up:</span>`+["overdue","today","upcoming","none"].map(k=>`<button class="chip ${k==="overdue"?"urg":""}" data-fu="${k}" aria-pressed="${F.fu===k}">${FU_LABEL[k]} <b>${fc.get(k)||0}</b></button>`).join("");
+
   // selects
   fill("fProp",[...new Set(rows.map(r=>r.prop))].sort(),F.prop,"All properties");
   const techs=[...new Set(rows.map(r=>r.tech).filter(Boolean))].sort();
@@ -256,12 +272,13 @@ function render(){
   const vis=rows.filter(r=>match(r));
   const k=sort.key,d=sort.dir;
   vis.sort((a,b)=>{let x=a[k],y=b[k];if(k==="days"){x=x??-1;y=y??-1;return (x-y)*d}
+    if(k==="fu"){x=a.fu||"9999";y=b.fu||"9999";return x.localeCompare(y)*d}
     if(k==="pri"){const o={Urgent:0,Normal:1,Low:2};return ((o[x]??3)-(o[y]??3))*d}
     return String(x).localeCompare(String(y),undefined,{numeric:true})*d});
   $("shown").textContent=active()?`Showing ${vis.length} of ${rows.length}`:`Showing all ${rows.length}`;
   renderActive();
   if(!vis.length){$("tableWrap").innerHTML=`<div class="empty">No work orders match these filters.</div>`;return}
-  const cols=[["wo","Work order"],["prop","Property / unit"],["status","Status"],["tech","Assigned to"],["pri","Priority"],["type","Type",1],["created","Created",1],["days","Days open"],["desc","Description"]];
+  const cols=[["wo","Work order"],["prop","Property / unit"],["status","Status"],["tech","Assigned to"],["pri","Priority"],["type","Type",1],["created","Created",1],["days","Days open"],["fu","Follow-up"],["desc","Description"]];
   const link=r=>r.path&&base?`<a href="${esc(base.replace(/\/$/,"")+r.path)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(r.wo)}</a>`:esc(r.wo);
   $("tableWrap").innerHTML=`<table><thead><tr>${cols.map(([c,l,sm])=>`<th class="${sm?"hide-sm":""}" data-sort="${c}" aria-sort="${k===c?(d>0?"ascending":"descending"):"none"}" tabindex="0">${l}</th>`).join("")}</tr></thead><tbody>`+
     vis.map((r,i)=>{const b=bandOf(r.days);const dc=b&&b.k==="90+"?"d3":b&&b.k==="31-90"?"d2":"";
@@ -274,6 +291,7 @@ function render(){
       <td class="hide-sm">${esc(r.type)}</td>
       <td class="hide-sm">${esc(r.created)}</td>
       <td class="days ${dc}">${r.days??""}</td>
+      <td class="fu ${({overdue:"over",today:"today",none:"unset"})[fuState(r)]||""}">${esc(fuText(r))}</td>
       <td><div class="desc">${esc(r.desc)}</div></td></tr>`}).join("")+`</tbody></table>`;
 }
 function renderActive(){
@@ -285,6 +303,7 @@ function renderActive(){
   if(F.prop)tags.push(["prop","",`Property: ${F.prop}`]);
   if(F.tech)tags.push(["tech","",`Tech: ${F.tech==="__none"?"Unassigned":F.tech}`]);
   if(F.type)tags.push(["type","",`Type: ${F.type}`]);
+  if(F.fu)tags.push(["fu","",`Follow-up: ${FU_LABEL[F.fu]}`]);
   $("active").innerHTML=`<span class="lbl">Filters:</span>`+(tags.length
     ?tags.map(([k,v,l])=>`<button class="tag" data-remove="${k}" data-val="${esc(v)}" title="Remove this filter">${esc(l)}<span class="x" aria-hidden="true">✕</span></button>`).join("")+`<button class="clearall" id="clear">Clear all filters</button>`
     :`<span class="none">None. Showing every open work order.</span>`);
@@ -306,6 +325,7 @@ document.addEventListener("click",e=>{
   else if(t.hasAttribute("data-urgent")){F.urgent=!F.urgent}
   else if(t.dataset.status!==undefined){const s=t.dataset.status;F.status=F.status.includes(s)?F.status.filter(x=>x!==s):F.status.concat(s)}
   else if(t.dataset.prop!==undefined){F.prop=F.prop===t.dataset.prop?"":t.dataset.prop}
+  else if(t.dataset.fu!==undefined){F.fu=F.fu===t.dataset.fu?"":t.dataset.fu}
   else if(t.dataset.tech!==undefined){F.tech=F.tech===t.dataset.tech?"":t.dataset.tech}
   else if(t.dataset.sort){const k=t.dataset.sort;sort=sort.key===k?{key:k,dir:-sort.dir}:{key:k,dir:k==="days"?-1:1}}
   else if(t.matches("tr.row")){t.classList.toggle("open");return}
@@ -313,7 +333,7 @@ document.addEventListener("click",e=>{
     if(k==="status")F.status=F.status.filter(x=>x!==t.dataset.val);
     else if(k==="urgent")F.urgent=false;
     else{F[k]="";if(k==="q")$("q").value=""}}
-  else if(t.id==="clear"){F={q:"",prop:"",tech:"",type:"",status:[],band:"",urgent:false};$("q").value=""}
+  else if(t.id==="clear"){F={q:"",prop:"",tech:"",type:"",status:[],band:"",urgent:false,fu:""};$("q").value=""}
   else return;
   save();render();
 });

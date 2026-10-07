@@ -57,6 +57,7 @@ FIELD_MAP = {
     "CREATED":         ["created_at", "created_on", "created"],
     "ASSIGNED TO":     ["assigned_user", "assigned_to", "maintenance_tech"],
     "SCHEDULED START": ["scheduled_start", "scheduled_start_date"],
+    "NEXT FOLLOWUP":   ["next_followup_date", "next_follow_up_date", "followup_date", "follow_up_date"],
 }
 ID_FIELDS = {
     "service_request_id": ["service_request_id"],
@@ -202,6 +203,7 @@ def normalize(raw):
         row["DESCRIPTION"] = redact(row["DESCRIPTION"])
         row["CREATED"] = to_date(row["CREATED"])
         row["SCHEDULED START"] = to_date(row["SCHEDULED START"])
+        row["NEXT FOLLOWUP"] = to_date(row["NEXT FOLLOWUP"])
         sr, wo = pick(rec, ID_FIELDS["service_request_id"]), pick(rec, ID_FIELDS["work_order_id"])
         num = row["WORK ORDER"]
         if num and not num.startswith("#"):
@@ -233,13 +235,17 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.StreamHandler()])
-    log.info("wo_dashboard.py version 2026-10-07c (hourly)")
+    log.info("wo_dashboard.py version 2026-10-07d (follow-up date)")
     cfg = load_config()
     raw = fetch_work_orders(cfg)
     log.info("AppFolio returned %s work orders", len(raw))
     log.info("Statuses from AppFolio: %s", sorted({str(pick(r, FIELD_MAP["STATUS"])) for r in raw}))
     created = sorted(to_date(pick(r, FIELD_MAP["CREATED"])) for r in raw if pick(r, FIELD_MAP["CREATED"]))
     log.info("Oldest work order created: %s", created[0] if created else "no created dates found")
+    if raw and not any(n in raw[0] for n in FIELD_MAP["NEXT FOLLOWUP"]):
+        log.warning("No follow-up date field found. Fields AppFolio sent: %s", ", ".join(sorted(raw[0])))
+    else:
+        log.info("Work orders with a follow-up date: %s", sum(1 for r in raw if pick(r, FIELD_MAP["NEXT FOLLOWUP"])))
 
     if a.inspect:
         # Field names and statuses only. No values, so nothing personal lands in the Actions log.
