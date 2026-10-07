@@ -45,6 +45,15 @@ jobs:
       - name: Build dashboard
         if: ${{ !inputs.inspect }}
         run: python wo_dashboard.py --out _site
+     
+      - name: Inspect labor report
+        if: ${{ inputs.inspect }}
+        run: python hours_dashboard.py --inspect
+
+      - name: Build tech hours page
+        if: ${{ !inputs.inspect }}
+        continue-on-error: true
+        run: python hours_dashboard.py --out _site
 
       - uses: actions/upload-pages-artifact@v3
         if: ${{ !inputs.inspect }}
