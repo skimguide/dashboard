@@ -33,7 +33,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-VERSION = "2026-10-07 hours v5 (90 days)"
+VERSION = "2026-10-07 hours v6 (90 days, weekly pulls)"
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "hours_template.html"
 CONFIG_PATH = HERE / "config.ini"
@@ -130,7 +130,7 @@ def find_report(cfg, filters):
             continue
         check(r)
         log.info("Using AppFolio report '%s'", name)
-        return name, r
+        return name, r, filters
     raise SystemExit(
         "AppFolio didn't accept these report names: " + ", ".join(names) + ".\n"
         "Find the labor report's API name in AppFolio's Reports API documentation and add it as a "
@@ -188,6 +188,59 @@ def fetch_all(cfg, first_response):
         else:
             raise SystemExit("AppFolio's next-page link didn't work in any form tried above. Send these log lines to get it fixed.")
     log.info("AppFolio returned %s labor entries (%s pages)", len(rows), page)
+    return rows
+
+
+def follow(cfg, r, nxt):
+    """Get the next page, or None if AppFolio won't serve it."""
+    auth = (cfg["client_id"], cfg["client_secret"])
+    for url in next_page_urls(cfg, r.url, nxt):
+        attempt = requests.get(url, auth=auth, timeout=180)
+        if attempt.status_code != 404:
+            check(attempt)
+            return attempt
+    return None
+
+
+def fetch_range(cfg, report, d1, d2, extra):
+    """Pull one date range. If it's too big for one page and AppFolio won't serve the next page, split it in half."""
+    body = {"paginate_results": True, **extra,
+            "labor_performed_from": d1.isoformat(), "labor_performed_to": d2.isoformat()}
+    r = post(cfg, report, body)
+    check(r)
+    data = r.json()
+    if isinstance(data, list):
+        return data
+    rows, nxt = list(data.get("results", [])), data.get("next_page_url")
+    while nxt:
+        got = follow(cfg, r, nxt)
+        if got is None:
+            if d1 < d2:
+                mid = d1 + (d2 - d1) // 2
+                log.info("  %s to %s is more than one page (%s+ entries); splitting it", d1, d2, len(rows))
+                return fetch_range(cfg, report, d1, mid, extra) + fetch_range(cfg, report, mid + timedelta(days=1), d2, extra)
+            log.info("  %s has more than %s entries and AppFolio wouldn't send the rest; keeping the first %s", d1, len(rows), len(rows))
+            return rows
+        r = got
+        data = r.json()
+        rows.extend(data.get("results", []))
+        nxt = data.get("next_page_url")
+    return rows
+
+
+def fetch_by_week(cfg, report, extra):
+    """Pull the date range a week at a time, so each request fits on one page."""
+    today = datetime.now(TZ).date()
+    first = today - timedelta(days=DAYS - 1)
+    extra = {k: v for k, v in extra.items() if not k.startswith("labor_performed_")}
+    rows, d = [], first
+    while d <= today:
+        end = min(d + timedelta(days=6), today)
+        part = fetch_range(cfg, report, d, end, extra)
+        log.info("%s to %s: %s entries", d, end, len(part))
+        rows.extend(part)
+        d = end + timedelta(days=1)
+    log.info("AppFolio returned %s labor entries in total", len(rows))
     return rows
 
 
@@ -332,7 +385,7 @@ def write_site(entries, first, last, base, out_dir):
 
 
 def inspect(cfg):
-    name, r = find_report(cfg, extra_filters())
+    name, r, _ = find_report(cfg, extra_filters())
     data = r.json()
     rows = data if isinstance(data, list) else data.get("results", [])
     if not rows:
@@ -361,8 +414,11 @@ def main():
         inspect(cfg)
         return
     base = f"https://{cfg['subdomain']}.appfolio.com/"
-    _, first_resp = find_report(cfg, extra_filters())
-    rows = fetch_all(cfg, first_resp)
+    report, first_resp, used = find_report(cfg, extra_filters())
+    if "labor_performed_from" in used:
+        rows = fetch_by_week(cfg, report, used)
+    else:
+        rows = fetch_all(cfg, first_resp)
     entries, first, last = build_entries(rows, base)
     write_site(entries, first, last, base, a.out)
 
