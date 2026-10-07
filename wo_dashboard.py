@@ -57,7 +57,7 @@ FIELD_MAP = {
     "CREATED":         ["created_at", "created_on", "created"],
     "ASSIGNED TO":     ["assigned_user", "assigned_to", "maintenance_tech"],
     "SCHEDULED START": ["scheduled_start", "scheduled_start_date"],
-    "NEXT FOLLOWUP":   ["next_followup_date", "next_follow_up_date", "followup_date", "follow_up_date"],
+    "NEXT FOLLOWUP":   ["follow_up_on", "next_followup_date", "next_follow_up_date", "followup_date", "follow_up_date"],
 }
 ID_FIELDS = {
     "service_request_id": ["service_request_id"],
@@ -235,7 +235,7 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.StreamHandler()])
-    log.info("wo_dashboard.py version 2026-10-07d (follow-up date)")
+    log.info("wo_dashboard.py version 2026-10-07e (follow_up_on)")
     cfg = load_config()
     raw = fetch_work_orders(cfg)
     log.info("AppFolio returned %s work orders", len(raw))
