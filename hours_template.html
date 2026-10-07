@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tech Hours on Work Orders</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --ink:#1C2733; --muted:#5D6B7A; --line:#D3DAE1;
+  --h1:#D4E3EF; --h2:#9FC0DA; --h3:#5B93BF; --h4:#1F5F8B; --h5:#163F5E;
+  --flag:#E0A100; --alert:#C2412D; --wkend:#F3F5F7; --sel:#FFF6D9;
+  --body:"Barlow", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --cond:"Barlow Condensed", "Arial Narrow", "Segoe UI", system-ui, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12181F; --surface:#1A222C; --ink:#E6ECF2; --muted:#93A1AF; --line:#2B3642;
+    --h1:#21384C; --h2:#2C5677; --h3:#3F7EAE; --h4:#76AEDB; --h5:#B5D6F0;
+    --flag:#F0B72F; --alert:#E2654F; --wkend:#161D25; --sel:#3A321A;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12181F; --surface:#1A222C; --ink:#E6ECF2; --muted:#93A1AF; --line:#2B3642;
+  --h1:#21384C; --h2:#2C5677; --h3:#3F7EAE; --h4:#76AEDB; --h5:#B5D6F0;
+  --flag:#F0B72F; --alert:#E2654F; --wkend:#161D25; --sel:#3A321A;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+.wrap{max-width:1280px;margin:0 auto;padding:28px 20px 48px}
+header h1{font-family:var(--cond);font-weight:700;font-size:clamp(30px,4.5vw,44px);line-height:1.05;margin:0 0 6px;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted);max-width:68ch}
+
+.figures{display:flex;flex-wrap:wrap;margin:26px 0 22px;border-top:3px solid var(--ink)}
+.fig{flex:1 1 180px;padding:12px 18px 4px 0;margin-right:18px}
+.fig b{display:block;font-family:var(--cond);font-weight:600;font-size:38px;line-height:1.05}
+.fig span{color:var(--muted);font-size:14px}
+
+.controls{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;margin-bottom:14px;font-size:15px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;border:0;background:transparent;color:var(--ink);padding:6px 12px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.controls label{display:inline-flex;align-items:center;gap:7px}
+.controls select,.controls input[type=number]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+.controls input[type=number]{width:62px}
+button:focus-visible,.cell .c:focus-visible,select:focus-visible,input:focus-visible,.tname:focus-visible{outline:2px solid var(--flag);outline-offset:2px}
+
+.gridbox{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow-x:auto}
+table.grid{border-collapse:separate;border-spacing:0;font-family:var(--cond);font-size:14px}
+.grid th,.grid td{padding:0}
+.grid thead th{vertical-align:bottom;font-weight:500;color:var(--muted)}
+.grid .tcol{position:sticky;left:0;z-index:2;background:var(--surface);text-align:left;min-width:178px;max-width:178px;padding:0 10px 0 12px;border-right:1px solid var(--line)}
+.grid thead .tcol{padding-bottom:8px;font-family:var(--body);font-size:13px}
+.dayh{width:32px;min-width:32px;text-align:center;padding:10px 0 6px}
+.dayh .bar{width:14px;margin:0 auto 5px;background:var(--h3);border-radius:2px 2px 0 0}
+.dayh .barwrap{height:64px;display:flex;align-items:flex-end;justify-content:center}
+.dayh .dw{display:block;font-size:12px;line-height:1}
+.dayh .dn{display:block;font-size:15px;color:var(--ink);font-weight:600;line-height:1.2}
+.dayh.wk,.cell.wk{background:var(--wkend)}
+.dayh.today .dn{color:var(--flag)}
+.sumh{min-width:58px;text-align:right;padding:0 12px 8px 4px;font-family:var(--body);font-size:13px}
+.grid tbody tr:hover .tcol,.grid tbody tr:hover .sum{background:var(--sel)}
+.grid tr.selected .tcol,.grid tr.selected .sum{background:var(--sel)}
+.tname{all:unset;cursor:pointer;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--body);font-size:14px;padding:4px 0;color:var(--ink)}
+.tname:hover{text-decoration:underline}
+.tname .tag{color:var(--muted);font-size:12px}
+.cell{width:32px;height:28px;text-align:center;border-bottom:1px solid var(--bg)}
+.cell .c{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;width:28px;height:24px;margin:0 auto;border-radius:3px;font-style:normal;font-weight:600;font-size:13px}
+.b1 .c{background:var(--h1);color:var(--ink)}
+.b2 .c{background:var(--h2);color:var(--ink)}
+.b3 .c{background:var(--h3);color:#fff}
+.b4 .c{background:var(--h4);color:#fff}
+.b5 .c{background:var(--h5);color:#fff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .b4 .c,:root:not([data-theme="light"]) .b5 .c{color:#10202E}}
+:root[data-theme="dark"] .b4 .c,:root[data-theme="dark"] .b5 .c{color:#10202E}
+.cell.over .c{box-shadow:inset 0 0 0 2px var(--flag)}
+.cell.way .c{background:var(--alert);color:#fff;box-shadow:none}
+.sum{text-align:right;padding:0 12px 0 4px;font-size:15px;font-weight:600;background:var(--surface);white-space:nowrap}
+.sum.first{border-left:1px solid var(--line)}
+.sum.m{color:var(--muted);font-weight:500}
+tfoot td{border-top:2px solid var(--ink);padding-top:6px;padding-bottom:6px;font-weight:600;font-size:13px;text-align:center;color:var(--ink)}
+tfoot .tcol{font-family:var(--body);font-size:14px}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:12px 0 0;color:var(--muted);font-size:13px}
+.legend .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:5px}
+
+.detail{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--h4);border-radius:8px;padding:16px 18px;margin:0 0 16px}
+.detail[hidden]{display:none}
+.detail-top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.detail h2{font-family:var(--cond);font-size:28px;margin:0;line-height:1.1}
+.detail .close{font:inherit;font-size:14px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer}
+.dstats{display:flex;flex-wrap:wrap;gap:6px 26px;margin:8px 0 14px;font-size:15px}
+.dstats b{font-family:var(--cond);font-size:22px;margin-right:4px}
+.dbars{display:flex;align-items:flex-end;gap:3px;height:110px;overflow-x:auto;padding-bottom:2px}
+.dbar{flex:1 0 14px;max-width:30px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.dbar span{width:100%;background:var(--h3);border-radius:2px 2px 0 0}
+.dbar.over span{background:var(--flag)}
+.dbar.way span{background:var(--alert)}
+.dbar em{font-style:normal;font-family:var(--cond);font-size:11px;color:var(--muted);margin-top:3px}
+
+section.flags{margin-top:30px}
+section.flags h2{font-family:var(--cond);font-size:26px;margin:0 0 4px}
+section.flags > p{margin:0 0 12px;color:var(--muted);max-width:72ch}
+.flaglist{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.flaglist li{display:flex;gap:14px;align-items:baseline;padding:10px 16px;border-top:1px solid var(--line)}
+.flaglist li:first-child{border-top:0}
+.flaglist .hrs{font-family:var(--cond);font-weight:700;font-size:22px;min-width:64px;color:var(--flag)}
+.flaglist .hrs.way{color:var(--alert)}
+.flaglist .note{color:var(--muted);font-size:14px}
+.flaglist .empty{color:var(--muted)}
+footer{margin-top:28px;color:var(--muted);font-size:13px;max-width:80ch}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+.cell .c:hover{filter:brightness(1.12)}
+.cell.picked .c{outline:3px solid var(--ink);outline-offset:-1px}
+.cell.hasov .c{text-decoration:underline wavy var(--flag);text-underline-offset:3px}
+.top-links{margin-top:8px;font-size:15px}
+.top-links a,.day a{color:var(--h4)}
+.dbar{cursor:pointer}
+.dbar:hover span{filter:brightness(1.15)}
+.day{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--flag);border-radius:8px;padding:16px 18px;margin:0 0 16px}
+.day[hidden]{display:none}
+.day-top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.day h2{font-family:var(--cond);font-size:26px;margin:0;line-height:1.1}
+.day .close{font:inherit;font-size:14px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer}
+.day .meta{color:var(--muted);margin:2px 0 12px;font-size:15px}
+.entries{overflow-x:auto}
+.entries table{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
+.entries th{text-align:left;font-weight:600;color:var(--muted);font-size:13px;padding:6px 10px 6px 0;border-bottom:1px solid var(--line)}
+.entries td{padding:8px 10px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.entries .n{text-align:right;white-space:nowrap}
+.entries td.n{font-family:var(--cond);font-size:17px;font-weight:600}
+.entries a{font-weight:600}
+.entries tr.ov td{background:var(--sel)}
+.ovtag{display:inline-block;font-size:12px;font-weight:600;color:#1C2733;background:var(--flag);border-radius:3px;padding:0 5px;margin-left:6px;white-space:nowrap}
+.entries .sub{display:block;color:var(--muted);font-size:13px}
+.entries tfoot td{border-bottom:0;font-weight:600}
+.dates{display:inline-flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.controls input[type=date]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+.dates.custom input[type=date]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.empty-state{padding:40px 20px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Tech hours on work orders</h1>
+    <p id="sub">Labor hours logged against AppFolio work orders, by technician and day.</p>
+    <p class="top-links"><a href="../">Open work orders dashboard</a></p>
+  </header>
+
+  <div class="figures" id="figures"></div>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Date range" id="range">
+      <button data-r="7">Last 7 days</button>
+      <button data-r="14">Last 14 days</button>
+      <button data-r="30">Last 30 days</button>
+      <button data-r="90">Last 90 days</button>
+    </div>
+    <span class="dates">
+      <label>From <input type="date" id="from"></label>
+      <label>to <input type="date" id="to"></label>
+    </span>
+    <label><input type="checkbox" id="wk"> Hide weekends</label>
+    <label>Sort by
+      <select id="sort">
+        <option value="total">Most hours</option>
+        <option value="avg">Avg per day worked</option>
+        <option value="name">Name</option>
+      </select>
+    </label>
+    <label>Flag days over <input type="number" id="thr" min="4" max="24" step="0.5" value="12"> hrs</label>
+  </div>
+
+  <div class="detail" id="detail" hidden></div>
+  <div class="day" id="day" hidden aria-live="polite"></div>
+
+  <div class="gridbox"><table class="grid" id="grid"></table></div>
+  <div class="legend" id="legend"></div>
+
+  <section class="flags">
+    <h2>Worth a look</h2>
+    <p>Days above the flag line usually mean a labor timer left running or time entered twice. Click a day to see its work orders. Entries whose times overlap are highlighted.</p>
+    <ul class="flaglist" id="flags"></ul>
+  </section>
+
+  <footer id="foot"></footer>
+</div>
+<script>
+const DATA = /*__DATA__*/null;
+
+const WAY_OVER = 16;
+const $ = id => document.getElementById(id);
+const addDays = (s, n) => { const x = new Date(s + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+const dow = s => new Date(s + 'T12:00:00Z').getUTCDay();
+const isWk = s => { const w = dow(s); return w === 0 || w === 6; };
+const fmtLong = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+const fmtShort = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const r1 = n => (Math.round(n * 10) / 10).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const plain = t => t.replace(' (Hidden)', '');
+const entriesWord = n => `${n} ${n === 1 ? 'entry' : 'entries'}`;
+
+if (!DATA || !DATA.entries) {
+  document.querySelector('.wrap').insertAdjacentHTML('beforeend', '<p class="empty-state">No data yet. Run the workflow in GitHub to build this page.</p>');
+  throw new Error('no data');
+}
+
+/* ---------- data ---------- */
+const allDates = [];
+for (let d = DATA.first; d <= DATA.last; d = addDays(d, 1)) allDates.push(d);
+const byTech = {};   // tech -> date -> {h, e, ov, list}
+DATA.entries.forEach(x => {
+  const c = ((byTech[x.t] ||= {})[x.d] ||= { h: 0, e: 0, ov: 0, list: [] });
+  c.h += x.h; c.e++; c.ov += x.ov ? 1 : 0; c.list.push(x);
+});
+Object.values(byTech).forEach(days => Object.values(days).forEach(c => {
+  c.list.sort((a, b) => toMin(a.s) - toMin(b.s));
+}));
+function toMin(s) {
+  const m = /^(\d+):(\d+) (AM|PM)$/.exec(s || ''); if (!m) return 9999;
+  return (+m[1] % 12 + (m[3] === 'PM' ? 12 : 0)) * 60 + +m[2];
+}
+const todayStr = DATA.last;
+
+/* ---------- state ---------- */
+const state = { range: Math.min(14, allDates.length), from: null, to: null, sort: 'total', hideWk: false, thr: 12, sel: null, pick: null };
+
+function rangeDates() {
+  if (state.from || state.to) {
+    const f = state.from || DATA.first, t = state.to || DATA.last;
+    return allDates.filter(d => d >= f && d <= t);
+  }
+  return allDates.slice(-state.range);
+}
+const visibleDates = () => rangeDates().filter(d => !(state.hideWk && isWk(d)));
+function statsFor(tech, dates) {
+  let tot = 0, days = 0, ent = 0, max = 0, maxD = null;
+  dates.forEach(d => {
+    const c = byTech[tech][d]; if (!c) return;
+    tot += c.h; ent += c.e; if (c.h > 0) days++;
+    if (c.h > max) { max = c.h; maxD = d; }
+  });
+  return { tot, days, ent, avg: days ? tot / days : 0, max, maxD };
+}
+function bin(h) {
+  if (h <= 0) return '';
+  if (h < 2) return 'b1';
+  if (h < 5) return 'b2';
+  if (h < 8) return 'b3';
+  if (h <= 10) return 'b4';
+  return 'b5';
+}
+
+/* ---------- render ---------- */
+function render() {
+  const dates = visibleDates();
+  const techs = Object.keys(byTech).map(t => ({ t, s: statsFor(t, dates) })).filter(x => x.s.ent > 0);
+  techs.sort((a, b) => {
+    if (a.t === 'Unassigned') return 1;
+    if (b.t === 'Unassigned') return -1;
+    if (state.sort === 'name') return a.t.localeCompare(b.t);
+    if (state.sort === 'avg') return b.s.avg - a.s.avg;
+    return b.s.tot - a.s.tot;
+  });
+
+  const dayTot = {}; dates.forEach(d => dayTot[d] = 0);
+  techs.forEach(x => dates.forEach(d => { const c = byTech[x.t][d]; if (c) dayTot[d] += c.h; }));
+  const maxDay = Math.max(1, ...Object.values(dayTot));
+
+  const real = techs.filter(x => x.t !== 'Unassigned');
+  const total = Object.values(dayTot).reduce((a, b) => a + b, 0);
+  const techDays = real.reduce((a, x) => a + x.s.days, 0);
+  const weekdays = dates.filter(d => !isWk(d) && d !== todayStr);
+  const avgWeekday = weekdays.length ? weekdays.reduce((a, d) => a + dayTot[d], 0) / weekdays.length : 0;
+  const todayTot = DATA.entries.filter(x => x.d === todayStr).reduce((a, x) => a + x.h, 0);
+  $('figures').innerHTML = dates.length ? `
+    <div class="fig"><b>${r1(total)}</b><span>hours logged, ${fmtShort(dates[0])} to ${fmtShort(dates[dates.length - 1])}</span></div>
+    <div class="fig"><b>${real.length}</b><span>techs logged time</span></div>
+    <div class="fig"><b>${r1(techDays ? real.reduce((a, x) => a + x.s.tot, 0) / techDays : 0)}</b><span>avg hours per tech on days worked</span></div>
+    <div class="fig"><b>${r1(avgWeekday)}</b><span>avg team hours per full weekday</span></div>
+    <div class="fig"><b>${r1(todayTot)}</b><span>logged today so far</span></div>` : '';
+
+  let h = '<thead><tr><th class="tcol" scope="col">Technician</th>';
+  dates.forEach(d => {
+    const pct = Math.round((dayTot[d] / maxDay) * 100);
+    h += `<th scope="col" class="dayh${isWk(d) ? ' wk' : ''}${d === todayStr ? ' today' : ''}" title="${fmtLong(d)}: ${r1(dayTot[d])} team hours">
+      <div class="barwrap"><div class="bar" style="height:${Math.max(pct, dayTot[d] ? 3 : 0)}%"></div></div>
+      <span class="dw">${'SMTWTFS'[dow(d)]}</span><span class="dn">${+d.slice(8)}</span></th>`;
+  });
+  h += '<th scope="col" class="sumh">Total</th><th scope="col" class="sumh">Days</th><th scope="col" class="sumh">Avg/day</th></tr></thead><tbody>';
+
+  techs.forEach(x => {
+    const hidden = x.t.includes('(Hidden)'), name = plain(x.t);
+    h += `<tr class="${state.sel === x.t ? 'selected' : ''}"><th scope="row" class="tcol">
+      <button class="tname" data-t="${esc(x.t)}" title="Show ${esc(name)}'s days">${esc(name)}${hidden ? ' <span class="tag">(hidden in AppFolio)</span>' : ''}</button></th>`;
+    dates.forEach(d => {
+      const c = byTech[x.t][d], wk = isWk(d) ? ' wk' : '';
+      if (!c) { h += `<td class="cell${wk}"></td>`; return; }
+      const flag = c.h > WAY_OVER ? ' way' : (c.h > state.thr ? ' over' : '');
+      const picked = state.pick && state.pick.t === x.t && state.pick.d === d ? ' picked' : '';
+      const txt = c.h === 0 ? '0' : (c.h < 10 ? r1(c.h).replace(/\.0$/, '') : Math.round(c.h));
+      const tip = `${name}, ${fmtLong(d)}: ${r1(c.h)} hrs across ${entriesWord(c.e)}${c.ov ? `, ${c.ov} overlapping` : ''}. Click to see work orders.`;
+      h += `<td class="cell ${bin(c.h)}${flag}${wk}${picked}${c.ov ? ' hasov' : ''}"><button class="c" data-t="${esc(x.t)}" data-d="${d}" title="${esc(tip)}" aria-label="${esc(tip)}">${c.h > 0 ? txt : ''}</button></td>`;
+    });
+    h += `<td class="sum first">${r1(x.s.tot)}</td><td class="sum m">${x.s.days}</td><td class="sum m">${r1(x.s.avg)}</td></tr>`;
+  });
+  h += '</tbody><tfoot><tr><td class="tcol">All techs</td>';
+  dates.forEach(d => h += `<td class="${isWk(d) ? 'cell wk' : ''}">${Math.round(dayTot[d])}</td>`);
+  h += `<td class="sum first">${r1(total)}</td><td></td><td></td></tr></tfoot>`;
+  $('grid').innerHTML = h;
+
+  $('legend').innerHTML = `
+    <span><span class="sw" style="background:var(--h1)"></span>under 2 hrs</span>
+    <span><span class="sw" style="background:var(--h2)"></span>2 to 5</span>
+    <span><span class="sw" style="background:var(--h3)"></span>5 to 8</span>
+    <span><span class="sw" style="background:var(--h4)"></span>8 to 10</span>
+    <span><span class="sw" style="background:var(--h5)"></span>over 10</span>
+    <span><span class="sw" style="background:var(--h4);box-shadow:inset 0 0 0 2px var(--flag)"></span>over ${state.thr} (flag)</span>
+    <span><span class="sw" style="background:var(--alert)"></span>over ${WAY_OVER}</span>
+    <span>Wavy underline means some entries that day overlap. Bars on top show team total per day; shaded columns are weekends.</span>`;
+
+  renderFlags(dates);
+  renderDetail(dates);
+  renderDay();
+  const custom = !!(state.from || state.to), rd = rangeDates();
+  document.querySelectorAll('#range button').forEach(b => b.setAttribute('aria-pressed', !custom && +b.dataset.r === state.range));
+  document.querySelector('.dates').classList.toggle('custom', custom);
+  if (rd.length && document.activeElement !== $('from') && document.activeElement !== $('to')) { $('from').value = rd[0]; $('to').value = rd[rd.length - 1]; }
+}
+
+function renderFlags(dates) {
+  const set = new Set(dates), items = [];
+  const cells = [];
+  Object.entries(byTech).forEach(([t, days]) => Object.entries(days).forEach(([d, c]) => { if (set.has(d)) cells.push({ t, d, c }); }));
+  cells.filter(x => x.t !== 'Unassigned' && (x.c.h > state.thr || x.c.ov))
+    .sort((a, b) => b.c.h - a.c.h)
+    .forEach(({ t, d, c }) => items.push(`<li><span class="hrs ${c.h > WAY_OVER ? 'way' : ''}">${r1(c.h)}</span>
+      <span><a href="#" data-t="${esc(t)}" data-d="${d}"><strong>${esc(plain(t))}</strong>, ${fmtLong(d)}</a>
+      <span class="note">${entriesWord(c.e)}${c.ov ? `, ${c.ov} with overlapping times` : ''}</span></span></li>`));
+  cells.filter(x => x.c.list.some(e => e.h === 0))
+    .forEach(({ t, d }) => items.push(`<li><span class="hrs">0.0</span><span><a href="#" data-t="${esc(t)}" data-d="${d}"><strong>${esc(plain(t))}</strong>, ${fmtLong(d)}</a> <span class="note">has a labor entry with no hours on it</span></span></li>`));
+  const un = cells.filter(x => x.t === 'Unassigned');
+  if (un.length) {
+    const tot = un.reduce((a, x) => a + x.c.h, 0);
+    items.push(`<li><span class="hrs">${r1(tot)}</span><span><strong>Unassigned</strong> <span class="note">labor with no technician on it (${un.map(x => `<a href="#" data-t="Unassigned" data-d="${x.d}">${fmtShort(x.d)}</a>`).join(', ')}). These hours don't count toward anyone.</span></span></li>`);
+  }
+  Object.keys(byTech).filter(t => t.includes('(Hidden)') && dates.some(d => byTech[t][d]))
+    .forEach(t => items.push(`<li><span class="hrs">${r1(statsFor(t, dates).tot)}</span><span><strong>${esc(plain(t))}</strong> <span class="note">is marked hidden in AppFolio but has labor in this range</span></span></li>`));
+  $('flags').innerHTML = items.length ? items.join('') : '<li class="empty">Nothing stands out in this range.</li>';
+}
+
+function renderDetail(dates) {
+  const el = $('detail');
+  if (!state.sel || !byTech[state.sel]) { el.hidden = true; return; }
+  const t = state.sel, s = statsFor(t, dates), name = plain(t);
+  const peak = Math.max(state.thr, s.max, 1);
+  const bars = dates.map(d => {
+    const c = byTech[t][d], v = c ? c.h : 0;
+    const cls = v > WAY_OVER ? 'way' : (v > state.thr ? 'over' : '');
+    return `<div class="dbar ${cls}" data-t="${esc(t)}" data-d="${d}" title="${fmtLong(d)}: ${r1(v)} hrs${c ? `, ${entriesWord(c.e)}` : ''}"><span style="height:${(v / peak) * 100}%"></span><em>${+d.slice(8)}</em></div>`;
+  }).join('');
+  el.innerHTML = `<div class="detail-top"><h2>${esc(name)}</h2><button class="close" data-close="sel">Close</button></div>
+    <div class="dstats">
+      <span><b>${r1(s.tot)}</b>hours</span>
+      <span><b>${s.days}</b>days worked</span>
+      <span><b>${r1(s.avg)}</b>avg per day worked</span>
+      <span><b>${s.ent ? r1(s.tot / s.ent) : '0.0'}</b>hours per labor entry</span>
+      <span><b>${r1(s.max)}</b>longest day${s.maxD ? ` (${fmtShort(s.maxD)})` : ''}</span>
+    </div>
+    <div class="dbars" role="img" aria-label="Daily hours for ${esc(name)}. Click a day to see its work orders.">${bars}</div>`;
+  el.hidden = false;
+}
+
+function renderDay() {
+  const el = $('day'), p = state.pick;
+  const c = p && byTech[p.t] && byTech[p.t][p.d];
+  if (!c) { el.hidden = true; return; }
+  const rows = c.list.map(x => {
+    const wo = x.wo ? (x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">#${esc(x.wo)}</a>` : `#${esc(x.wo)}`) : '<span class="sub">No work order</span>';
+    const time = x.s || x.e ? `${esc(x.s || '?')} to ${esc(x.e || '?')}` : '<span class="sub">No times</span>';
+    return `<tr class="${x.ov ? 'ov' : ''}">
+      <td>${time}${x.ov ? '<span class="ovtag">Overlaps</span>' : ''}</td>
+      <td>${wo}${x.st ? `<span class="sub">${esc(x.st)}</span>` : ''}</td>
+      <td>${esc(x.p) || '<span class="sub">No property</span>'}${x.u ? `<span class="sub">${esc(x.u)}</span>` : ''}</td>
+      <td>${esc(x.iss)}</td>
+      <td class="n">${r1(x.h)}</td></tr>`;
+  }).join('');
+  const woCount = new Set(c.list.map(x => x.wo).filter(Boolean)).size;
+  el.innerHTML = `<div class="day-top"><h2>${esc(plain(p.t))}, ${fmtLong(p.d)}</h2><button class="close" data-close="pick">Close</button></div>
+    <p class="meta">${r1(c.h)} hours across ${entriesWord(c.e)} on ${woCount} ${woCount === 1 ? 'work order' : 'work orders'}${c.ov ? `. ${c.ov} entries have overlapping times, which usually means double-counted hours.` : '.'}</p>
+    <div class="entries"><table>
+      <thead><tr><th scope="col">Time</th><th scope="col">Work order</th><th scope="col">Property</th><th scope="col">Issue</th><th scope="col" class="n">Hours</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="4">Total</td><td class="n">${r1(c.h)}</td></tr></tfoot>
+    </table></div>`;
+  el.hidden = false;
+}
+
+/* ---------- wiring ---------- */
+const smooth = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+function openDay(t, d) {
+  state.pick = state.pick && state.pick.t === t && state.pick.d === d ? null : { t, d };
+  render();
+  if (state.pick) $('day').scrollIntoView({ block: 'nearest', behavior: smooth() });
+}
+$('range').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.range = Math.min(+b.dataset.r, allDates.length); state.from = state.to = null; render(); } });
+['from', 'to'].forEach(id => {
+  const el = $(id); el.min = DATA.first; el.max = DATA.last;
+  el.addEventListener('change', () => {
+    let f = $('from').value || DATA.first, t = $('to').value || DATA.last;
+    if (f < DATA.first) f = DATA.first; if (t > DATA.last) t = DATA.last;
+    if (f > t) [f, t] = [t, f];
+    state.from = f; state.to = t; render();
+    $('from').value = f; $('to').value = t;
+  });
+});
+$('wk').addEventListener('change', e => { state.hideWk = e.target.checked; render(); });
+$('sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
+$('thr').addEventListener('input', e => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) { state.thr = v; render(); } });
+document.addEventListener('click', e => {
+  const close = e.target.closest('[data-close]');
+  if (close) { state[close.dataset.close] = null; render(); return; }
+  const name = e.target.closest('.tname');
+  if (name) {
+    state.sel = state.sel === name.dataset.t ? null : name.dataset.t; render();
+    if (state.sel) $('detail').scrollIntoView({ block: 'nearest', behavior: smooth() });
+    return;
+  }
+  const hit = e.target.closest('[data-t][data-d]');
+  if (hit) { e.preventDefault(); openDay(hit.dataset.t, hit.dataset.d); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.pick) { state.pick = null; render(); } });
+
+$('sub').textContent = `Labor hours logged against AppFolio work orders, by technician and day. Updated ${DATA.generated}; today is still in progress.`;
+$('foot').textContent = 'Hours are the worked-hours value on each work order labor entry in AppFolio, summed per technician per day. Click a name to see that tech\'s days, or click a day to see the work orders behind it.';
+render();
+</script>
+</body>
+</html>
