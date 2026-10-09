@@ -129,7 +129,7 @@ footer{margin-top:30px;color:var(--muted);font-size:14px}
       </div>
     </div>
     <ul class="rules">
-      <li>Leases starting November through February, countersigned Oct 5 – Dec 31, 12-month terms only.</li>
+      <li>Leases starting November through February, countersigned Oct 6 – Dec 31, 12-month terms only.</li>
       <li>Each property counts toward its site manager.</li>
       <li>A property manager can win only one category.</li>
     </ul>
@@ -195,7 +195,7 @@ function renderRN(){
   const rate = [...teams].sort((a, b) => b.pct - a.pct || b.won - a.won || a.manager.localeCompare(b.manager));
 
   const detail = t => {
-    const rows = t.renewals.map(x => `<tr><td>${esc(x.prop)} ${esc(x.unit)}</td><td>${fmtDate(x.start)}</td><td>${fmtDate(x.signed)}</td><td>${x.counts ? "Counts" : `<span class="no">${!x.signed || x.signed < "2026-10-05" ? "Signed before Oct 5" : !/12/.test(x.term) ? "Not 12-month" : "Not counted"}</span>`}</td></tr>`).join("");
+    const rows = t.renewals.map(x => `<tr><td>${esc(x.prop)} ${esc(x.unit)}</td><td>${fmtDate(x.start)}</td><td>${fmtDate(x.signed)}</td><td>${x.counts ? "Counts" : `<span class="no">${!x.signed || x.signed < "2026-10-06" ? "Signed before Oct 6" : !/12/.test(x.term) ? "Not 12-month" : "Not counted"}</span>`}</td></tr>`).join("");
     return `<p class="sub" style="font-size:14px;margin:0 0 8px">${esc(t.props.join(", "))}</p>` +
       (rows ? `<div class="tablewrap"><table><thead><tr><th>Unit</th><th>Lease start</th><th>Countersigned</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="no" style="margin:0">No renewals yet. ${t.total} leases pending.</p>`);
   };

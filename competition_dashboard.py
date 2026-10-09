@@ -16,9 +16,9 @@ Work Order Competition (Oct 8-31, 2026)
 
 Renewal Competition (through Dec 31, 2026)
   - Leases starting Nov 2026 - Feb 2027, statuses Renewed and Pending.
-  - A renewal counts if it is 12-month and countersigned Oct 5 - Dec 31, 2026.
+  - A renewal counts if it is 12-month and countersigned Oct 6 - Dec 31, 2026.
   - Like the saved report's column filters, only 12-month leases are included, and
-    leases countersigned before Oct 5 are left out entirely.
+    leases countersigned before Oct 6 are left out entirely.
   - Renewal % = counted renewals / those leases.
   - Each property counts toward its site manager (the property manager on the board).
 
@@ -61,7 +61,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-09 competition v8 (correct work order codes)"
+VERSION = "2026-10-09 competition v9 (renewals from Oct 6)"
 HERE = Path(__file__).resolve().parent
 WO_TEMPLATE = HERE / "workordercomp_template.html"
 RN_TEMPLATE = HERE / "renewalcomp_template.html"
@@ -78,7 +78,7 @@ EMERGENCY_TEXT = "emergency call"
 UNIT_TURN_POINTS = 3
 
 RN_LEASE_FROM, RN_LEASE_TO = date(2026, 11, 1), date(2027, 2, 28)
-RN_SIGNED_FROM, RN_END = date(2026, 10, 5), date(2026, 12, 31)   # countersigned Oct 5 - Dec 31
+RN_SIGNED_FROM, RN_END = date(2026, 10, 6), date(2026, 12, 31)   # countersigned Oct 6 - Dec 31
 RN_STATUSES = {"renewed", "pending"}
 RN_PRIZE = "$1,000"
 
@@ -430,7 +430,7 @@ def score_renewals(c):
     raw = fetch_renewals(c)
     by_id, by_name = fetch_site_managers(c)
     managers, statuses, transfers = {}, {}, 0
-    skipped = {"not 12-month": 0, "countersigned before Oct 5": 0}
+    skipped = {"not 12-month": 0, "countersigned before Oct 6": 0}
     for r in raw:
         start = to_date(pick(r, RN_FIELDS["start"]))
         status = clean(pick(r, RN_FIELDS["status"]), 30)
@@ -448,7 +448,7 @@ def score_renewals(c):
             skipped["not 12-month"] += 1
             continue
         if signed is not None and signed < RN_SIGNED_FROM:
-            skipped["countersigned before Oct 5"] += 1
+            skipped["countersigned before Oct 6"] += 1
             continue
         prop = clean(pick(r, RN_FIELDS["property"]), 60)
         pid = str(pick(r, RN_FIELDS["property_id"]) or "")
