@@ -16,8 +16,10 @@ Work Order Competition (Oct 8-31, 2026)
 
 Renewal Competition (through Dec 31, 2026)
   - Leases starting Nov 2026 - Feb 2027, statuses Renewed and Pending.
-  - A renewal counts if it is 12-month and countersigned Oct 6 - Dec 31, 2026.
-  - Renewal % = counted renewals / all Renewed + Pending leases in that window.
+  - A renewal counts if it is 12-month and countersigned Oct 5 - Dec 31, 2026.
+  - Like the saved report's column filters, only 12-month leases are included, and
+    leases countersigned before Oct 5 are left out entirely.
+  - Renewal % = counted renewals / those leases.
   - Each property counts toward its site manager (the property manager on the board).
 
 Usage:
@@ -59,7 +61,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-08 competition v5 (renewal filters + site managers)"
+VERSION = "2026-10-08 competition v7 (renewals from Oct 5)"
 HERE = Path(__file__).resolve().parent
 WO_TEMPLATE = HERE / "workordercomp_template.html"
 RN_TEMPLATE = HERE / "renewalcomp_template.html"
@@ -76,7 +78,7 @@ EMERGENCY_TEXT = "emergency call"
 UNIT_TURN_POINTS = 3
 
 RN_LEASE_FROM, RN_LEASE_TO = date(2026, 11, 1), date(2027, 2, 28)
-RN_SIGNED_AFTER, RN_END = date(2026, 10, 5), date(2026, 12, 31)   # countersigned Oct 6 - Dec 31
+RN_SIGNED_FROM, RN_END = date(2026, 10, 5), date(2026, 12, 31)   # countersigned Oct 5 - Dec 31
 RN_STATUSES = {"renewed", "pending"}
 RN_PRIZE = "$1,000"
 
@@ -464,6 +466,7 @@ def score_renewals(c):
     raw = fetch_renewals(c)
     by_id, by_name = fetch_site_managers(c)
     managers, statuses, transfers = {}, {}, 0
+    skipped = {"not 12-month": 0, "countersigned before Oct 5": 0}
     for r in raw:
         start = to_date(pick(r, RN_FIELDS["start"]))
         status = clean(pick(r, RN_FIELDS["status"]), 30)
@@ -473,16 +476,23 @@ def score_renewals(c):
         if str(pick(r, RN_FIELDS["transfer"])).strip().lower() in ("yes", "true", "1"):
             transfers += 1
             continue
+        term = clean(pick(r, RN_FIELDS["term"]), 30)
+        signed = to_date(pick(r, RN_FIELDS["signed"]))
+        # Same as the saved report's column filters: Term contains "12 month", and
+        # Countersigned Date after the start or blank.
+        if "12 month" not in term.lower():
+            skipped["not 12-month"] += 1
+            continue
+        if signed is not None and signed < RN_SIGNED_FROM:
+            skipped["countersigned before Oct 5"] += 1
+            continue
         prop = clean(pick(r, RN_FIELDS["property"]), 60)
         pid = str(pick(r, RN_FIELDS["property_id"]) or "")
         mgr = by_id.get(pid) or by_name.get(norm_name(prop).lower()) or "No site manager listed"
-        term = clean(pick(r, RN_FIELDS["term"]), 30)
-        signed = to_date(pick(r, RN_FIELDS["signed"]))
         t = managers.setdefault(mgr, {"manager": mgr, "props": set(), "total": 0, "won": 0, "renewals": []})
         t["props"].add(prop)
         t["total"] += 1
-        counts = (status.lower() == "renewed" and "12" in term
-                  and signed is not None and RN_SIGNED_AFTER < signed <= RN_END)
+        counts = status.lower() == "renewed" and signed is not None and signed <= RN_END
         if status.lower() == "renewed":
             t["renewals"].append({"unit": clean(pick(r, RN_FIELDS["unit"]), 20), "prop": prop,
                                   "start": start.isoformat(), "signed": signed.isoformat() if signed else "",
@@ -492,6 +502,7 @@ def score_renewals(c):
     log.info("Renewal statuses from AppFolio: %s", statuses)
     if transfers:
         log.info("Skipped %s tenant transfers", transfers)
+    log.info("Left out (saved report's column filters): %s", skipped)
     out = []
     for t in managers.values():
         t["props"] = sorted(t["props"])
