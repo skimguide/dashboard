@@ -26,6 +26,7 @@ import logging
 import os
 import re
 import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
@@ -33,7 +34,28 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-VERSION = "2026-10-07 hours v6 (90 days, weekly pulls)"
+
+# AppFolio answers 429 ("Retry later") when it gets too many requests in a short time.
+# Wait and try again instead of failing the whole page.
+def _with_retry(fn):
+    def call(*args, **kwargs):
+        waits = [15, 30, 60, 120, 240]
+        while True:
+            r = fn(*args, **kwargs)
+            if r.status_code != 429 or not waits:
+                return r
+            ra = r.headers.get("Retry-After", "")
+            wait = min(int(ra), 300) if ra.isdigit() else waits[0]
+            waits.pop(0)
+            logging.getLogger("appfolio").info("AppFolio is rate limiting (429); waiting %ss and retrying", wait)
+            time.sleep(wait)
+    return call
+
+
+requests.post = _with_retry(requests.post)
+requests.get = _with_retry(requests.get)
+
+VERSION = "2026-10-08 hours v7 (retries on 429)"
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "hours_template.html"
 CONFIG_PATH = HERE / "config.ini"

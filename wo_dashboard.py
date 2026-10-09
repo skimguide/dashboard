@@ -21,11 +21,33 @@ import logging
 import os
 import re
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import requests
+
+
+# AppFolio answers 429 ("Retry later") when it gets too many requests in a short time.
+# Wait and try again instead of failing the whole page.
+def _with_retry(fn):
+    def call(*args, **kwargs):
+        waits = [15, 30, 60, 120, 240]
+        while True:
+            r = fn(*args, **kwargs)
+            if r.status_code != 429 or not waits:
+                return r
+            ra = r.headers.get("Retry-After", "")
+            wait = min(int(ra), 300) if ra.isdigit() else waits[0]
+            waits.pop(0)
+            logging.getLogger("appfolio").info("AppFolio is rate limiting (429); waiting %ss and retrying", wait)
+            time.sleep(wait)
+    return call
+
+
+requests.post = _with_retry(requests.post)
+requests.get = _with_retry(requests.get)
 
 HERE = Path(__file__).resolve().parent
 CONFIG_PATH = HERE / "config.ini"
@@ -66,6 +88,7 @@ ID_FIELDS = {
 COLUMNS = list(FIELD_MAP)
 
 log = logging.getLogger("wo")
+VERSION = "2026-10-08 work orders v2 (retries on 429)"
 
 
 # ---------------------------------------------------------------- config / api
@@ -232,6 +255,8 @@ def main():
     ap.add_argument("--inspect", action="store_true", help="print the fields AppFolio returns and exit")
     ap.add_argument("--out", default="_site", help="folder to write the site into (default: _site)")
     a = ap.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    log.info("wo_dashboard %s", VERSION)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.StreamHandler()])

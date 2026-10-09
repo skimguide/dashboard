@@ -38,7 +38,28 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-VERSION = "2026-10-08 competition v3 (separate workflows)"
+
+# AppFolio answers 429 ("Retry later") when it gets too many requests in a short time.
+# Wait and try again instead of failing the whole page.
+def _with_retry(fn):
+    def call(*args, **kwargs):
+        waits = [15, 30, 60, 120, 240]
+        while True:
+            r = fn(*args, **kwargs)
+            if r.status_code != 429 or not waits:
+                return r
+            ra = r.headers.get("Retry-After", "")
+            wait = min(int(ra), 300) if ra.isdigit() else waits[0]
+            waits.pop(0)
+            logging.getLogger("appfolio").info("AppFolio is rate limiting (429); waiting %ss and retrying", wait)
+            time.sleep(wait)
+    return call
+
+
+requests.post = _with_retry(requests.post)
+requests.get = _with_retry(requests.get)
+
+VERSION = "2026-10-08 competition v4 (fewer calls, retries on 429)"
 HERE = Path(__file__).resolve().parent
 WO_TEMPLATE = HERE / "workordercomp_template.html"
 RN_TEMPLATE = HERE / "renewalcomp_template.html"
@@ -62,6 +83,9 @@ RN_PRIZE = "$1,000"
 # Status codes AppFolio uses on the work order report that we already know are open.
 # The closed-status codes aren't documented, so the script finds them (see find_status_codes).
 OPEN_STATUS_CODES = {"0", "1", "2", "3", "6", "9"}
+# From the first live run: 4 = Completed, 5 = Canceled, 7 = Completed No Need To Bill, 8 = Work Done.
+KNOWN_COUNT_CODES = ["4", "7"]
+READY_TO_BILL_CANDIDATES = [str(i) for i in range(10, 16)]
 
 WO_FIELDS = {
     "number":   ["work_order_number", "work_order", "wo_number"],
@@ -192,24 +216,25 @@ def wo_body(status_code, date_code, d1, d2):
 
 
 def find_status_codes(c, today):
-    """Which status codes return Completed / Ready to Bill / Completed No Need To Bill."""
+    """Status codes for Completed, Completed No Need To Bill, and Ready to Bill.
+    The first two are known; Ready to Bill is looked up among codes 10-15 until it's saved."""
     forced = os.environ.get("WO_STATUS_CODES", "").strip()
     if forced:
         return [x.strip() for x in forced.split(",") if x.strip()]
-    found = {}
-    for code in [str(i) for i in range(0, 16) if str(i) not in OPEN_STATUS_CODES]:
+    codes = list(KNOWN_COUNT_CODES)
+    for code in READY_TO_BILL_CANDIDATES:
         rows = report(c, "work_order", wo_body(code, 0, today - timedelta(days=21), today), soft=True)
         statuses = sorted({clean(pick(r, WO_FIELDS["status"])) for r in rows or []} - {""})
         if statuses:
             log.info("  status code %s -> %s (%s rows)", code, ", ".join(statuses), len(rows))
-        if {s.lower() for s in statuses} & WO_COUNT_STATUSES:
-            found[code] = statuses
-    if not found:
-        raise SystemExit("Couldn't find AppFolio's status codes for Completed / Ready to Bill. "
-                         "Run the workflow with 'inspect' checked and send the log.")
-    log.info("Completed-type status codes: %s  (set repository variable WO_STATUS_CODES=%s to skip this check)",
-             ", ".join(found), ",".join(found))
-    return list(found)
+        if "ready to bill" in {x.lower() for x in statuses}:
+            codes.append(code)
+            break
+    else:
+        log.info("  Ready to Bill wasn't found in codes 10-15 (none in the last 21 days?)")
+    log.info("Status codes to count: %s  (set repository variable WO_STATUS_CODES=%s to skip this lookup)",
+             ", ".join(codes), ",".join(codes))
+    return codes
 
 
 def find_completed_date_code(c, codes, today):
@@ -219,10 +244,7 @@ def find_completed_date_code(c, codes, today):
         return forced
     d1 = today - timedelta(days=10)
     for dc in range(1, 10):
-        rows = []
-        for sc in codes:
-            got = report(c, "work_order", wo_body(sc, dc, d1, today), soft=True)
-            rows += got or []
+        rows = report(c, "work_order", wo_body(codes[0], dc, d1, today), soft=True) or []
         done = [to_date(pick(r, WO_FIELDS["completed"])) for r in rows]
         if rows and all(x and d1 <= x <= today for x in done):
             log.info("Completed On is status_date code %s (%s rows checked)  "
@@ -257,7 +279,9 @@ def fetch_labor(c, numbers, earliest, today):
     if not numbers:
         return out, set()
     techs = set()
-    start = max(earliest, today - timedelta(days=180))
+    # Hours on competition work orders are logged around when they're completed, so
+    # start a week before the competition instead of going back months.
+    start = max(earliest, WO_START - timedelta(days=7))
     for d1, d2 in weeks(start, today):
         rows = report(c, "work_order_labor_summary",
                       {"labor_performed_from": d1.isoformat(), "labor_performed_to": d2.isoformat()})
@@ -464,8 +488,8 @@ def inspect(c, today):
                        ("renewal_summary", {})]:
         rows = report(c, name, body, soft=True) or []
         log.info("%s: %s rows; fields: %s", name, len(rows), sorted(rows[0]) if rows else "-")
-    log.info("Work order status codes:")
-    for code in range(0, 16):
+    log.info("Work order status codes 10-15:")
+    for code in range(10, 16):
         rows = report(c, "work_order", wo_body(code, 0, today - timedelta(days=21), today), soft=True)
         log.info("  %s -> %s", code, sorted({clean(pick(r, WO_FIELDS["status"])) for r in rows or []}))
 
