@@ -2,9 +2,10 @@ name: Refresh renewal competition 2026
 
 on:
   schedule:
-    # Hourly at :05 past, 6 AM to 7 PM Pacific, so the page is ready before the
-    # main dashboard workflow publishes at :17.
-    - cron: "5 13-23,0-2 * * *"
+    # Hourly at :50 past, 6 AM to 7 PM Pacific. Kept apart from the main dashboard
+    # run at :17 so AppFolio doesn't get all the requests at once. The page goes live
+    # with the main workflow's next publish.
+    - cron: "50 13-23,0-2 * * *"
   workflow_dispatch:
     inputs:
       inspect:
