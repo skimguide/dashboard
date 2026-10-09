@@ -1,0 +1,3 @@
+# Work orders removed from the Work Order Competition after review.
+# One per line: the work order number, then the reason (optional). Example:
+# 65571-1 Duplicate of 65570-1

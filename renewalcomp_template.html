@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Renewal Competition 2026</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --ink:#1C2733; --muted:#5D6B7A; --line:#D3DAE1;
+  --accent:#1F5F8B; --bar:#9FC0DA; --gold:#C8961E; --silver:#8C99A6; --bronze:#A8673A;
+  --flag:#E0A100; --alert:#C2412D; --sel:#FFF6D9;
+  --body:"Barlow","Segoe UI",system-ui,-apple-system,sans-serif;
+  --cond:"Barlow Condensed","Arial Narrow","Segoe UI",system-ui,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12181F; --surface:#1A222C; --ink:#E6ECF2; --muted:#93A1AF; --line:#2B3642;
+    --accent:#76AEDB; --bar:#2C5677; --gold:#E3B341; --silver:#A9B5C1; --bronze:#C98A5B;
+    --flag:#F0B72F; --alert:#E2654F; --sel:#3A321A;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12181F; --surface:#1A222C; --ink:#E6ECF2; --muted:#93A1AF; --line:#2B3642;
+  --accent:#76AEDB; --bar:#2C5677; --gold:#E3B341; --silver:#A9B5C1; --bronze:#C98A5B;
+  --flag:#F0B72F; --alert:#E2654F; --sel:#3A321A;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+.wrap{max-width:960px;margin:0 auto;padding:28px 20px 56px}
+a{color:var(--accent)}
+.back{font-size:15px;text-decoration:none}
+h1{font-family:var(--cond);font-weight:700;font-size:clamp(30px,4.5vw,44px);line-height:1.05;margin:10px 0 6px;letter-spacing:-.01em}
+h2{font-family:var(--cond);font-weight:600;font-size:26px;margin:0 0 4px}
+.sub{margin:0;color:var(--muted);max-width:68ch}
+
+.tabs{display:flex;gap:4px;margin:22px 0 0;border-bottom:3px solid var(--ink)}
+.tabs button{font:600 20px/1 var(--cond);background:none;border:0;color:var(--muted);padding:12px 16px 10px;cursor:pointer;border-radius:6px 6px 0 0}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.tabs button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.figures{display:flex;flex-wrap:wrap;margin:18px 0 26px}
+.fig{flex:1 1 150px;padding:4px 18px 4px 0;margin-right:18px}
+.fig b{display:block;font-family:var(--cond);font-weight:600;font-size:38px;line-height:1.05}
+.fig span{color:var(--muted);font-size:14px}
+
+/* The leaderboard: the one bold thing on the page */
+.board{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.row{border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row > button{all:unset;box-sizing:border-box;display:grid;grid-template-columns:44px minmax(110px,220px) 1fr auto;align-items:center;gap:14px;width:100%;padding:12px 16px;cursor:pointer}
+.row > button:hover{background:var(--bg)}
+.row > button:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.rank{font:700 26px/1 var(--cond);color:var(--muted);text-align:center}
+.p1 .rank{color:var(--gold)} .p2 .rank{color:var(--silver)} .p3 .rank{color:var(--bronze)}
+.name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.name small{display:block;font-weight:400;color:var(--muted);font-size:13px;white-space:normal}
+.track{display:block;height:14px;background:var(--bg);border-radius:7px;overflow:hidden}
+.fill{display:block;height:100%;background:var(--bar);border-radius:7px;transition:width .6s ease-out}
+.p1 .fill{background:var(--gold)} .p2 .fill{background:var(--silver)} .p3 .fill{background:var(--bronze)}
+.score{font:700 28px/1 var(--cond);text-align:right;min-width:72px}
+.score small{display:block;font:500 13px/1.3 var(--body);color:var(--muted)}
+.prize{display:inline-block;font:600 13px/1 var(--body);padding:3px 7px;border-radius:4px;background:var(--sel);color:var(--ink);margin-left:8px;vertical-align:2px}
+.detail{display:none;padding:4px 16px 16px 74px}
+.row.open .detail{display:block}
+@media (max-width:620px){
+  .row > button{grid-template-columns:34px 1fr auto;gap:10px}
+  .track{grid-column:2 / 4;grid-row:2}
+  .detail{padding-left:16px}
+}
+@media (prefers-reduced-motion: reduce){.fill{transition:none}}
+
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-weight:600;color:var(--muted);padding:6px 10px 6px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 10px 6px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.tag{font-size:12px;padding:1px 6px;border-radius:4px;background:var(--bg);white-space:nowrap}
+.tag.warn{background:var(--sel)}
+.no{color:var(--muted)}
+
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media (max-width:820px){.cols{grid-template-columns:1fr}}
+.cols h2{margin-top:4px}
+.cols .row > button{grid-template-columns:34px 1fr auto;gap:6px 10px}
+.cols .track{grid-column:2 / 4;grid-row:2}
+.cols .detail{padding-left:16px}
+.cols .sub{margin-bottom:12px;font-size:15px}
+.note{background:var(--sel);border-left:4px solid var(--flag);padding:10px 14px;border-radius:4px;margin:0 0 20px;max-width:75ch}
+
+details.extra{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 16px}
+details.extra summary{cursor:pointer;font-weight:600}
+details.extra p{color:var(--muted);font-size:15px;margin:8px 0 12px;max-width:72ch}
+.rules{color:var(--muted);font-size:15px;max-width:75ch;margin-top:26px}
+.rules li{margin-bottom:4px}
+footer{margin-top:30px;color:var(--muted);font-size:14px}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../">Maintenance dashboards</a>
+  <h1>Renewal competition 2026</h1>
+  <p class="sub" id="updated"></p>
+
+  <section id="p-rn">
+    <div class="figures" id="rn-figs"></div>
+    <p class="note" id="rn-note" hidden></p>
+    <div class="cols">
+      <div>
+        <h2>Most renewals</h2>
+        <p class="sub">Property managers ranked by counted 12-month renewals.</p>
+        <ol class="board" id="rn-most"></ol>
+      </div>
+      <div>
+        <h2>Highest renewal rate</h2>
+        <p class="sub">Property managers ranked by counted renewals out of all leases starting Nov–Feb.</p>
+        <ol class="board" id="rn-pct"></ol>
+      </div>
+    </div>
+    <ul class="rules">
+      <li>Leases starting November through February, countersigned Oct 6 – Dec 31, 12-month terms only.</li>
+      <li>Each property counts toward its site manager.</li>
+      <li>A property manager can win only one category.</li>
+    </ul>
+  </section>
+  <footer>Data from AppFolio, refreshed hourly during business hours.</footer>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDate = iso => iso ? new Date(iso + "T12:00:00").toLocaleDateString("en-US", {month:"short", day:"numeric"}) : "";
+const num = n => (Math.round(n * 100) / 100).toLocaleString("en-US", {maximumFractionDigits: 2});
+const plural = (n, w) => `${num(n)} ${w}${n === 1 ? "" : "s"}`;
+
+function daysLeft(endIso){
+  const end = new Date(endIso + "T23:59:59"), now = new Date(DATA.today + "T12:00:00");
+  return Math.max(0, Math.ceil((end - now) / 86400000));
+}
+function figs(el, items){
+  el.innerHTML = items.map(([v, l]) => `<div class="fig"><b>${v}</b><span>${esc(l)}</span></div>`).join("");
+}
+function rowHtml(i, place, name, sub, pct, score, scoreSub, prize, detail){
+  const cls = place <= 3 ? ` p${place}` : "";
+  return `<li class="row${cls}">
+    <button aria-expanded="false" data-i="${i}">
+      <span class="rank">${place}</span>
+      <span class="name">${esc(name)}${prize ? `<span class="prize">${esc(prize)}</span>` : ""}${sub ? `<small>${esc(sub)}</small>` : ""}</span>
+      <span class="track" aria-hidden="true"><span class="fill" style="width:${pct}%"></span></span>
+      <span class="score">${score}${scoreSub ? `<small>${scoreSub}</small>` : ""}</span>
+    </button>
+    <div class="detail">${detail}</div>
+  </li>`;
+}
+function wireRows(list){
+  list.addEventListener("click", e => {
+    const b = e.target.closest(".row > button");
+    if (!b) return;
+    const li = b.parentElement, open = !li.classList.contains("open");
+    li.classList.toggle("open", open);
+    b.setAttribute("aria-expanded", open);
+  });
+}
+function places(items, key){
+  // Ties share a place
+  let last = null, place = 0;
+  return items.map((x, i) => { if (x[key] !== last){ place = i + 1; last = x[key]; } return place; });
+}
+
+/* ---------------- Renewals ---------------- */
+function renderRN(){
+  const r = DATA.rn, teams = r.managers;
+  const won = teams.reduce((a, t) => a + t.won, 0), total = teams.reduce((a, t) => a + t.total, 0);
+  const left = daysLeft(r.end);
+  figs($("#rn-figs"), [
+    [left, left === 1 ? "day left" : "days left"],
+    [won, "renewals counted"],
+    [total ? `${Math.round(100 * won / total)}%` : "0%", `of ${total} leases starting Nov–Feb`],
+  ]);
+
+  const most = [...teams].sort((a, b) => b.won - a.won || b.pct - a.pct || a.manager.localeCompare(b.manager));
+  const rate = [...teams].sort((a, b) => b.pct - a.pct || b.won - a.won || a.manager.localeCompare(b.manager));
+
+  const detail = t => {
+    const rows = t.renewals.map(x => `<tr><td>${esc(x.prop)} ${esc(x.unit)}</td><td>${fmtDate(x.start)}</td><td>${fmtDate(x.signed)}</td><td>${x.counts ? "Counts" : `<span class="no">${!x.signed || x.signed <= "2026-10-05" ? "Signed before Oct 6" : !/12/.test(x.term) ? "Not 12-month" : "Not counted"}</span>`}</td></tr>`).join("");
+    return `<p class="sub" style="font-size:14px;margin:0 0 8px">${esc(t.props.join(", "))}</p>` +
+      (rows ? `<div class="tablewrap"><table><thead><tr><th>Unit</th><th>Lease start</th><th>Countersigned</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="no" style="margin:0">No renewals yet. ${t.total} leases pending.</p>`);
+  };
+  const leaderMost = most[0] && most[0].won > 0 ? most[0].manager : null;
+  const leaderRate = rate[0] && rate[0].won > 0 ? rate[0].manager : null;
+
+  const topWon = Math.max(1, ...teams.map(t => t.won)), topPct = Math.max(1, ...teams.map(t => t.pct)), plM = places(most, "won"), plR = places(rate, "pct");
+  $("#rn-most").innerHTML = most.map((t, i) =>
+    rowHtml(i, plM[i], t.manager, `${t.props.length} ${t.props.length === 1 ? "property" : "properties"}`, Math.max(2, 100 * t.won / topWon), t.won, `of ${t.total}`,
+      plM[i] === 1 && t.won > 0 ? r.prize : "", detail(t))).join("");
+  $("#rn-pct").innerHTML = rate.map((t, i) =>
+    rowHtml(i, plR[i], t.manager, `${t.won} of ${t.total} leases`, Math.max(2, 100 * t.pct / topPct), `${num(t.pct)}%`, "",
+      plR[i] === 1 && t.won > 0 ? r.prize : "", detail(t))).join("");
+
+  const note = $("#rn-note");
+  if (leaderMost && leaderMost === leaderRate){
+    note.hidden = false;
+    note.textContent = `${leaderMost} is leading both categories. A property manager can win only one, so the other category goes to the runner-up.`;
+  } else note.hidden = true;
+}
+
+
+if (!DATA){
+  $("#updated").textContent = "No data yet. The page fills in after the next refresh.";
+} else {
+  $("#updated").textContent = `Updated ${DATA.generated}`.replace(/\.?$/, ".");
+  renderRN();
+  ["#rn-most", "#rn-pct"].forEach(s => wireRows($(s)));
+}
+</script>
+</body>
+</html>
