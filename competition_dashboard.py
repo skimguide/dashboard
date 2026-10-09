@@ -21,7 +21,9 @@ Renewal Competition (through Dec 31, 2026)
   - Each property counts toward its site manager (the property manager on the board).
 
 Usage:
-    python competition_dashboard.py --out _site
+    python competition_dashboard.py --out _site                    # both pages
+    python competition_dashboard.py --only workorders --out out    # just one page
+    python competition_dashboard.py --only renewals --out out
     python competition_dashboard.py --inspect     # list fields and status codes, build nothing
 """
 import argparse
@@ -36,7 +38,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-VERSION = "2026-10-08 competition v2 (two pages)"
+VERSION = "2026-10-08 competition v3 (separate workflows)"
 HERE = Path(__file__).resolve().parent
 WO_TEMPLATE = HERE / "workordercomp_template.html"
 RN_TEMPLATE = HERE / "renewalcomp_template.html"
@@ -472,6 +474,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="_site")
     ap.add_argument("--inspect", action="store_true")
+    ap.add_argument("--only", choices=["workorders", "renewals"], help="build just one page")
     a = ap.parse_args()
     log.info("competition_dashboard %s", VERSION)
     c = cfg()
@@ -485,18 +488,20 @@ def main():
              "today": today.isoformat()}
     failed = []
     # Build each page on its own, so a problem with one doesn't stop the other.
-    try:
+    if a.only != "renewals":
+      try:
         wo = score_work_orders(c, today, base_url)
         wo.pop("staff", None)
         write_page(WO_TEMPLATE, WO_FOLDER, {**stamp, "wo": {**wo, "start": WO_START.isoformat(),
                    "end": WO_END.isoformat(), "prizes": WO_PRIZES}}, a.out)
-    except (Exception, SystemExit) as e:
+      except (Exception, SystemExit) as e:
         log.error("Work order competition page failed: %s", e)
         failed.append("work orders")
-    try:
+    if a.only != "workorders":
+      try:
         rn = score_renewals(c)
         write_page(RN_TEMPLATE, RN_FOLDER, {**stamp, "rn": {**rn, "end": RN_END.isoformat(), "prize": RN_PRIZE}}, a.out)
-    except (Exception, SystemExit) as e:
+      except (Exception, SystemExit) as e:
         log.error("Renewal competition page failed: %s", e)
         failed.append("renewals")
     if failed:
