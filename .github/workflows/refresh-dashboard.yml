@@ -28,6 +28,11 @@ jobs:
       APPFOLIO_CLIENT_SECRET: ${{ secrets.APPFOLIO_CLIENT_SECRET }}
       APPFOLIO_SUBDOMAIN: guidemanagement
       APPFOLIO_FILTERS: ${{ vars.APPFOLIO_FILTERS }}
+      WO_STATUS_CODES: ${{ vars.WO_STATUS_CODES }}
+      WO_COMPLETED_DATE_CODE: ${{ vars.WO_COMPLETED_DATE_CODE }}
+      MAINTENANCE_STAFF: ${{ vars.MAINTENANCE_STAFF }}
+      NOT_MAINTENANCE: ${{ vars.NOT_MAINTENANCE }}
+      APPFOLIO_RENEWAL_FILTERS: ${{ vars.APPFOLIO_RENEWAL_FILTERS }}
     steps:
       - uses: actions/checkout@v4
 
@@ -54,6 +59,15 @@ jobs:
         if: ${{ !inputs.inspect }}
         continue-on-error: true
         run: python hours_dashboard.py --out _site
+
+      - name: Inspect competition reports
+        if: ${{ inputs.inspect }}
+        run: python competition_dashboard.py --inspect
+
+      - name: Build competition pages
+        if: ${{ !inputs.inspect }}
+        continue-on-error: true
+        run: python competition_dashboard.py --out _site
 
       - name: Build home page
         if: ${{ !inputs.inspect }}
@@ -86,6 +100,8 @@ jobs:
             <h1>Maintenance dashboards</h1>
             <a class="card" href="workorders/"><b>Open work orders</b><span>Every open work order in AppFolio, refreshed hourly.</span></a>
             <a class="card" href="hours/"><b>Tech hours on work orders</b><span>Hours each technician logs to work orders, by day.</span></a>
+            <a class="card" href="workordercomp2026/"><b>Work order competition 2026</b><span>Technician standings, Oct 8–31.</span></a>
+            <a class="card" href="renewalcomp2026/"><b>Renewal competition 2026</b><span>Property manager standings through Dec 31.</span></a>
           </main>
           </body>
           </html>
