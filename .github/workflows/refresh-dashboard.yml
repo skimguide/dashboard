@@ -80,7 +80,7 @@ jobs:
           <meta charset="utf-8">
           <meta name="robots" content="noindex, nofollow">
           <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-          <title>Maintenance Dashboards</title>
+          <title>Guide Dashboards</title>
           <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Barlow+Condensed:wght@700&display=swap" rel="stylesheet">
           <style>
           :root{--bg:#EEF1F4;--surface:#fff;--ink:#1C2733;--muted:#5D6B7A;--line:#D3DAE1;--accent:#1F5F8B}
@@ -97,7 +97,7 @@ jobs:
           </head>
           <body>
           <main>
-            <h1>Maintenance dashboards</h1>
+            <h1>Guide Dashboards</h1>
             <a class="card" href="workorders/"><b>Open work orders</b><span>Every open work order in AppFolio, refreshed hourly.</span></a>
             <a class="card" href="hours/"><b>Tech hours on work orders</b><span>Hours each technician logs to work orders, by day.</span></a>
             <a class="card" href="workordercomp2026/"><b>Work order competition 2026</b><span>Technician standings, Oct 8–31.</span></a>
