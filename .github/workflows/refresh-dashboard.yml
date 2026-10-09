@@ -28,11 +28,6 @@ jobs:
       APPFOLIO_CLIENT_SECRET: ${{ secrets.APPFOLIO_CLIENT_SECRET }}
       APPFOLIO_SUBDOMAIN: guidemanagement
       APPFOLIO_FILTERS: ${{ vars.APPFOLIO_FILTERS }}
-      WO_STATUS_CODES: ${{ vars.WO_STATUS_CODES }}
-      WO_COMPLETED_DATE_CODE: ${{ vars.WO_COMPLETED_DATE_CODE }}
-      MAINTENANCE_STAFF: ${{ vars.MAINTENANCE_STAFF }}
-      NOT_MAINTENANCE: ${{ vars.NOT_MAINTENANCE }}
-      APPFOLIO_RENEWAL_FILTERS: ${{ vars.APPFOLIO_RENEWAL_FILTERS }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,14 +55,22 @@ jobs:
         continue-on-error: true
         run: python hours_dashboard.py --out _site
 
-      - name: Inspect competition reports
-        if: ${{ inputs.inspect }}
-        run: python competition_dashboard.py --inspect
-
-      - name: Build competition pages
+      # The competition pages are built by their own workflows, which save each page to a
+      # branch (pages-workordercomp2026, pages-renewalcomp2026). This only copies them in,
+      # since GitHub Pages publishes the whole site at once.
+      - name: Add competition pages
         if: ${{ !inputs.inspect }}
         continue-on-error: true
-        run: python competition_dashboard.py --out _site
+        run: |
+          for p in workordercomp2026 renewalcomp2026; do
+            if git fetch -q --depth 1 origin "pages-$p"; then
+              mkdir -p "_site/$p"
+              git show FETCH_HEAD:index.html > "_site/$p/index.html"
+              echo "Added $p"
+            else
+              echo "No pages-$p branch yet; skipping"
+            fi
+          done
 
       - name: Build home page
         if: ${{ !inputs.inspect }}
