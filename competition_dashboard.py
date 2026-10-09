@@ -59,7 +59,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-08 competition v4 (fewer calls, retries on 429)"
+VERSION = "2026-10-08 competition v5 (renewal filters + site managers)"
 HERE = Path(__file__).resolve().parent
 WO_TEMPLATE = HERE / "workordercomp_template.html"
 RN_TEMPLATE = HERE / "renewalcomp_template.html"
@@ -106,14 +106,23 @@ LABOR_FIELDS = {
     "tech":   ["maintenance_tech", "maintenance_technician", "technician"],
     "hours":  ["worked_hours", "hours_worked"],      # "hours" is billable hours; don't use it
 }
+# Renewal Summary's API fields (report columns UnitName, PropertyName, PropertyId, LeaseStart,
+# Status, Term, CountersignedDate, TenantTransfer). It has no site manager column; that
+# comes from the Property Directory report (SiteManagerName), matched by property.
 RN_FIELDS = {
     "unit":      ["unit_name", "unit"],
     "property":  ["property_name", "property"],
-    "manager":   ["site_manager_name", "site_manager"],
+    "property_id": ["property_id"],
+    "transfer":  ["tenant_transfer"],
     "start":     ["lease_start", "lease_start_date", "start_date"],
     "status":    ["status", "renewal_status"],
     "term":      ["term", "lease_term"],
     "signed":    ["countersigned_date", "countersigned_on", "countersigned_at"],
+}
+PD_FIELDS = {
+    "property_id": ["property_id"],
+    "property":    ["property_name", "property"],
+    "manager":     ["site_manager_name"],
 }
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -403,41 +412,70 @@ def score_work_orders(c, today, base_url):
 
 # ---------------------------------------------------------------- renewals
 def fetch_renewals(c):
-    """Renewal Summary for leases starting Nov 2026 - Feb 2027. The API's filter names for
-    this report aren't documented, so try the likely ones and filter again here either way."""
+    """Renewal Summary with the same filters as the saved report: active units, leases starting
+    Nov 2026 - Feb 2027, no tenant transfers, no non-revenue units. AppFolio's API doesn't say
+    which month format it wants for the lease range, so try each and keep the one it honors.
+    Rows are filtered again here either way."""
+    base = {"unit_visibility": "active", "float_start_on": "0",
+            "include_tenant_transfers": "false", "non_revenue_units": "false"}
     forced = os.environ.get("APPFOLIO_RENEWAL_FILTERS", "").strip()
-    tries = [json.loads(forced)] if forced else [
-        {"from_date": "11/2026", "to_date": "02/2027"},
-        {"lease_range_from": "11/2026", "lease_range_to": "02/2027"},
-        {"from_date": mdy(RN_LEASE_FROM), "to_date": mdy(RN_LEASE_TO)},
-        {},
+    ranges = [json.loads(forced)] if forced else [
+        {"start_on_from": "11/2026", "start_on_to": "02/2027"},
+        {"start_on_from": "Nov 2026", "start_on_to": "Feb 2027"},
+        {"start_on_from": "2026-11", "start_on_to": "2027-02"},
+        {"start_on_from": "11/01/2026", "start_on_to": "02/28/2027"},
     ]
-    best = []
-    for body in tries:
-        rows = report(c, "renewal_summary", body, soft=True)
+    in_range = lambda r: (d := to_date(pick(r, RN_FIELDS["start"]))) and RN_LEASE_FROM <= d <= RN_LEASE_TO
+    best = None
+    for rng in ranges:
+        rows = report(c, "renewal_summary", {**base, **rng}, soft=True)
         if rows is None:
-            log.info("Renewal filters %s: not accepted", body)
+            log.info("Renewal filters %s: not accepted", rng)
             continue
-        hits = sum(1 for r in rows if (d := to_date(pick(r, RN_FIELDS["start"]))) and RN_LEASE_FROM <= d <= RN_LEASE_TO)
-        log.info("Renewal filters %s: %s rows, %s starting Nov-Feb", body, len(rows), hits)
-        if hits > len([r for r in best if (d := to_date(pick(r, RN_FIELDS["start"]))) and RN_LEASE_FROM <= d <= RN_LEASE_TO]):
+        hits = sum(1 for r in rows if in_range(r))
+        log.info("Renewal filters %s: %s rows, %s starting Nov-Feb", rng, len(rows), hits)
+        if best is None or (hits and len(rows) < len(best)):
             best = rows
-        if hits and hits == len(rows):
+        if rows and hits == len(rows):
+            log.info("Lease range format works: set repository variable APPFOLIO_RENEWAL_FILTERS=%s to skip this check",
+                     json.dumps(rng))
             break
-    return best
+    return best or []
+
+
+def fetch_site_managers(c):
+    """Property -> site manager, from the Property Directory report."""
+    rows = report(c, "property_directory", {"property_visibility": "active"})
+    by_id, by_name = {}, {}
+    for r in rows:
+        mgr = norm_name(pick(r, PD_FIELDS["manager"]))
+        pid = str(pick(r, PD_FIELDS["property_id"]) or "")
+        name = norm_name(pick(r, PD_FIELDS["property"])).lower()
+        if pid:
+            by_id[pid] = mgr
+        if name:
+            by_name[name] = mgr
+    log.info("Property Directory: %s properties, %s with a site manager",
+             len(rows), sum(1 for v in by_id.values() if v) or sum(1 for v in by_name.values() if v))
+    return by_id, by_name
 
 
 def score_renewals(c):
     raw = fetch_renewals(c)
-    managers, statuses = {}, {}
+    by_id, by_name = fetch_site_managers(c)
+    managers, statuses, transfers = {}, {}, 0
     for r in raw:
         start = to_date(pick(r, RN_FIELDS["start"]))
         status = clean(pick(r, RN_FIELDS["status"]), 30)
         statuses[status] = statuses.get(status, 0) + 1
         if not (start and RN_LEASE_FROM <= start <= RN_LEASE_TO) or status.lower() not in RN_STATUSES:
             continue
-        mgr = norm_name(pick(r, RN_FIELDS["manager"])) or "No site manager listed"
+        if str(pick(r, RN_FIELDS["transfer"])).strip().lower() in ("yes", "true", "1"):
+            transfers += 1
+            continue
         prop = clean(pick(r, RN_FIELDS["property"]), 60)
+        pid = str(pick(r, RN_FIELDS["property_id"]) or "")
+        mgr = by_id.get(pid) or by_name.get(norm_name(prop).lower()) or "No site manager listed"
         term = clean(pick(r, RN_FIELDS["term"]), 30)
         signed = to_date(pick(r, RN_FIELDS["signed"]))
         t = managers.setdefault(mgr, {"manager": mgr, "props": set(), "total": 0, "won": 0, "renewals": []})
@@ -452,6 +490,8 @@ def score_renewals(c):
         if counts:
             t["won"] += 1
     log.info("Renewal statuses from AppFolio: %s", statuses)
+    if transfers:
+        log.info("Skipped %s tenant transfers", transfers)
     out = []
     for t in managers.values():
         t["props"] = sorted(t["props"])
