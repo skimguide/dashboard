@@ -122,8 +122,9 @@ footer{margin-top:28px;color:var(--muted);font-size:13px;max-width:80ch}
 .cell .c:hover{filter:brightness(1.12)}
 .cell.picked .c{outline:3px solid var(--ink);outline-offset:-1px}
 .cell.hasov .c{text-decoration:underline wavy var(--flag);text-underline-offset:3px}
-.top-links{margin-top:8px;font-size:15px}
-.top-links a,.day a{color:var(--h4)}
+.back{display:inline-block;margin-bottom:10px;font-size:15px;color:var(--h4);text-decoration:none}
+.back:hover{text-decoration:underline}
+.day a{color:var(--h4)}
 .dbar{cursor:pointer}
 .dbar:hover span{filter:brightness(1.15)}
 .day{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--flag);border-radius:8px;padding:16px 18px;margin:0 0 16px}
@@ -151,10 +152,10 @@ footer{margin-top:28px;color:var(--muted);font-size:13px;max-width:80ch}
 </head>
 <body>
 <div class="wrap">
+  <a class="back" href="../">Guide Dashboards</a>
   <header>
     <h1>Tech hours on work orders</h1>
     <p id="sub">Labor hours logged against AppFolio work orders, by technician and day.</p>
-    <p class="top-links"><a href="../">Open work orders dashboard</a></p>
   </header>
 
   <div class="figures" id="figures"></div>
