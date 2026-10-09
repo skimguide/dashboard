@@ -1,0 +1,64 @@
+name: Refresh renewal competition 2026
+
+on:
+  schedule:
+    # Hourly at :05 past, 6 AM to 7 PM Pacific, so the page is ready before the
+    # main dashboard workflow publishes at :17.
+    - cron: "5 13-23,0-2 * * *"
+  workflow_dispatch:
+    inputs:
+      inspect:
+        description: "Only list the fields and status codes AppFolio returns (no publish)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write     # to save the built page to the pages-renewalcomp2026 branch
+  actions: write      # to start the main dashboard workflow after a manual run
+
+concurrency:
+  group: renewalcomp2026
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      APPFOLIO_CLIENT_ID: ${{ secrets.APPFOLIO_CLIENT_ID }}
+      APPFOLIO_CLIENT_SECRET: ${{ secrets.APPFOLIO_CLIENT_SECRET }}
+      APPFOLIO_SUBDOMAIN: guidemanagement
+      APPFOLIO_RENEWAL_FILTERS: ${{ vars.APPFOLIO_RENEWAL_FILTERS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Inspect AppFolio reports
+        if: ${{ inputs.inspect }}
+        run: python competition_dashboard.py --inspect
+
+      - name: Build page
+        if: ${{ !inputs.inspect }}
+        run: python competition_dashboard.py --only renewals --out out
+
+      - name: Save page to the pages-renewalcomp2026 branch
+        if: ${{ !inputs.inspect }}
+        run: |
+          cd out/renewalcomp2026
+          git init -q -b pages-renewalcomp2026
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -q -m "renewal competition 2026 $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:pages-renewalcomp2026
+
+      - name: Publish now (manual runs only)
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.inspect }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run refresh-dashboard.yml --repo ${{ github.repository }}
