@@ -61,7 +61,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-09 competition v9 (renewals from Oct 6)"
+VERSION = "2026-10-09 competition v10 (office creators count)"
 HERE = Path(__file__).resolve().parent
 WO_TEMPLATE = HERE / "workordercomp_template.html"
 RN_TEMPLATE = HERE / "renewalcomp_template.html"
@@ -75,6 +75,12 @@ WO_PRIZES = ["$500", "$250", "$100"]
 WO_COUNT_STATUSES = {"completed", "ready to bill", "completed no need to bill"}
 WO_COUNT_TYPES = {"unit turn", "resident", "internal"}
 EMERGENCY_TEXT = "emergency call"
+# Office and management staff: work orders they create always count, even if they
+# sometimes get assigned work orders or log hours themselves.
+CREATOR_ALWAYS_COUNTS = [
+    "Alice Hazelton", "Joe Herauf", "Nikki Ewing-Erdman", "Dotty Nuetzmann",
+    "Khaled Al Ashor", "Adriana Amaris", "Shelby Astudillo",
+]
 UNIT_TURN_POINTS = 3
 
 RN_LEASE_FROM, RN_LEASE_TO = date(2026, 11, 1), date(2027, 2, 28)
@@ -325,7 +331,7 @@ def score_work_orders(c, today, base_url):
     staff = {t for w in wos for t in w["techs"]} | labor_techs
     staff |= {norm_name(x) for x in os.environ.get("MAINTENANCE_STAFF", "").split(",") if x.strip()}
     staff -= {norm_name(x) for x in os.environ.get("NOT_MAINTENANCE", "").split(",") if x.strip()}
-    staff_l = {s.lower() for s in staff}
+    staff_l = {s.lower() for s in staff} - {norm_name(x).lower() for x in CREATOR_ALWAYS_COUNTS}
 
     dq = load_dq()
     counted, excluded, credits, flags = [], [], {}, []
