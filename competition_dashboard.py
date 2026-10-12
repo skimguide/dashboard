@@ -61,7 +61,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-09 competition v10 (office creators count)"
+VERSION = "2026-10-09 competition v11 (manager reassignments)"
 HERE = Path(__file__).resolve().parent
 WO_TEMPLATE = HERE / "workordercomp_template.html"
 RN_TEMPLATE = HERE / "renewalcomp_template.html"
@@ -87,6 +87,10 @@ RN_LEASE_FROM, RN_LEASE_TO = date(2026, 11, 1), date(2027, 2, 28)
 RN_SIGNED_FROM, RN_END = date(2026, 10, 6), date(2026, 12, 31)   # countersigned Oct 6 - Dec 31
 RN_STATUSES = {"renewed", "pending"}
 RN_PRIZE = "$1,000"
+# Site managers in AppFolio whose properties count for someone else in the competition.
+MANAGER_REASSIGN = {
+    "Alex Barnia": "Emma Ottey",
+}
 
 # Status codes AppFolio uses on the work order report that we already know are open.
 OPEN_STATUS_CODES = {"0", "1", "2", "3", "6", "9"}
@@ -432,6 +436,9 @@ def fetch_site_managers(c):
     return by_id, by_name
 
 
+REASSIGN_L = {norm_name(k).lower(): norm_name(v) for k, v in MANAGER_REASSIGN.items()}
+
+
 def score_renewals(c):
     raw = fetch_renewals(c)
     by_id, by_name = fetch_site_managers(c)
@@ -459,6 +466,7 @@ def score_renewals(c):
         prop = clean(pick(r, RN_FIELDS["property"]), 60)
         pid = str(pick(r, RN_FIELDS["property_id"]) or "")
         mgr = by_id.get(pid) or by_name.get(norm_name(prop).lower()) or "No site manager listed"
+        mgr = REASSIGN_L.get(mgr.lower(), mgr)
         t = managers.setdefault(mgr, {"manager": mgr, "props": set(), "total": 0, "won": 0, "renewals": []})
         t["props"].add(prop)
         t["total"] += 1
