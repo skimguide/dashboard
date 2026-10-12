@@ -55,14 +55,14 @@ jobs:
         continue-on-error: true
         run: python hours_dashboard.py --out _site
 
-      # The competition pages are built by their own workflows, which save each page to a
-      # branch (pages-workordercomp2026, pages-renewalcomp2026). This only copies them in,
+      # The competition and lead to lease pages are built by their own workflows, which save each
+      # page to a branch (pages-workordercomp2026, pages-renewalcomp2026, pages-leadtolease). This only copies them in,
       # since GitHub Pages publishes the whole site at once.
-      - name: Add competition pages
+      - name: Add pages built by other workflows
         if: ${{ !inputs.inspect }}
         continue-on-error: true
         run: |
-          for p in workordercomp2026 renewalcomp2026; do
+          for p in workordercomp2026 renewalcomp2026 leadtolease; do
             if git fetch -q --depth 1 origin "pages-$p"; then
               mkdir -p "_site/$p"
               git show FETCH_HEAD:index.html > "_site/$p/index.html"
@@ -108,6 +108,7 @@ jobs:
             <a class="card" href="hours/"><b>Tech hours on work orders</b><span>Hours each technician logs to work orders, by day.</span></a>
             <a class="card" href="workordercomp2026/"><b>Work order competition 2026</b><span>Technician standings, Oct 8–31.</span></a>
             <a class="card" href="renewalcomp2026/"><b>Renewal competition 2026</b><span>Property manager standings through Dec 31.</span></a>
+            <a class="card" href="leadtolease/"><b>Lead to lease</b><span>Leads, showings, leases and advertised rent by property, week by week.</span></a>
           </main>
           </body>
           </html>
