@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lead to Lease</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --ink:#1C2733; --muted:#5D6B7A; --line:#D3DAE1;
+  --accent:#1F5F8B; --bar:#9FC0DA; --ok:#2E7D4F; --flag:#E0A100; --alert:#C2412D; --sel:#FFF6D9; --alertbg:#FBE9E6;
+  --body:"Barlow","Segoe UI",system-ui,-apple-system,sans-serif;
+  --cond:"Barlow Condensed","Arial Narrow","Segoe UI",system-ui,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12181F; --surface:#1A222C; --ink:#E6ECF2; --muted:#93A1AF; --line:#2B3642;
+    --accent:#76AEDB; --bar:#2C5677; --ok:#6FCB94; --flag:#F0B72F; --alert:#E2654F; --sel:#3A321A; --alertbg:#3A2320;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12181F; --surface:#1A222C; --ink:#E6ECF2; --muted:#93A1AF; --line:#2B3642;
+  --accent:#76AEDB; --bar:#2C5677; --ok:#6FCB94; --flag:#F0B72F; --alert:#E2654F; --sel:#3A321A; --alertbg:#3A2320;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 56px}
+a{color:var(--accent)}
+.back{font-size:15px;text-decoration:none}
+h1{font-family:var(--cond);font-weight:700;font-size:clamp(30px,4.5vw,44px);line-height:1.05;margin:10px 0 6px;letter-spacing:-.01em}
+h2{font-family:var(--cond);font-weight:600;font-size:24px;margin:0 0 6px}
+h3{font-family:var(--cond);font-weight:600;font-size:19px;margin:0 0 6px}
+.sub{margin:0;color:var(--muted);max-width:72ch}
+
+.tabs{display:flex;gap:4px;margin:22px 0 0;border-bottom:3px solid var(--ink)}
+.tabs button{font:600 20px/1 var(--cond);background:none;border:0;color:var(--muted);padding:12px 16px 10px;cursor:pointer;border-radius:6px 6px 0 0}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.controls{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;margin:20px 0 4px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{font:500 15px/1 var(--body);background:none;border:0;border-left:1px solid var(--line);color:var(--ink);padding:9px 12px;cursor:pointer}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.dates{display:flex;gap:10px;align-items:center;font-size:15px}
+.dates input{font:inherit;font-size:15px;padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.rent small{display:block;font-size:12.5px;color:var(--muted);font-weight:400}
+
+.utable td.chg{white-space:normal;color:var(--muted)}
+.vtag{font-size:12px;padding:1px 6px;border-radius:4px;background:var(--sel);margin-left:6px;white-space:nowrap}
+label.check{display:inline-flex;gap:8px;align-items:center;font-size:15px;cursor:pointer}
+input[type=search]{font:inherit;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:220px}
+.range{color:var(--muted);font-size:14px;margin:0 0 4px}
+
+/* The funnel: the one bold thing on the page */
+.focus{margin:16px 0 -8px;font-size:15px}
+.focus b{font-weight:600}
+.focus button{font:inherit;font-size:15px;background:none;border:0;color:var(--accent);text-decoration:underline;cursor:pointer;padding:0;margin-left:6px}
+.funnel{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:18px 0 26px;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.stage{padding:14px 18px 16px;border-left:1px solid var(--line);position:relative}
+.stage:first-child{border-left:0}
+.stage b{display:block;font:700 40px/1 var(--cond)}
+.stage > span{color:var(--muted);font-size:14px}
+.stage .conv{display:block;margin-top:8px;font-size:14px}
+.conv.bad{color:var(--alert);font-weight:600}
+.conv.good{color:var(--ok);font-weight:600}
+@media (max-width:700px){.funnel{grid-template-columns:1fr 1fr}.stage:nth-child(3){border-left:0}.stage:nth-child(n+3){border-top:1px solid var(--line)}}
+
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th{text-align:left;font-weight:600;color:var(--muted);padding:0;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface)}
+th button{all:unset;cursor:pointer;display:block;padding:10px 10px;white-space:normal;line-height:1.2;max-width:110px}
+th:first-child button,th:last-child button{max-width:none}
+th button:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+th button[data-dir]::after{content:" ▾";font-size:12px}
+th button[data-dir="asc"]::after{content:" ▴"}
+th.n button,td.n{text-align:right}
+th.n button{margin-left:auto}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n{font-variant-numeric:tabular-nums}
+tbody tr.prop{cursor:pointer}
+tbody tr.prop:hover{background:var(--bg)}
+tbody tr.prop.open{background:var(--bg)}
+tbody tr.prop td:first-child{font-weight:600;min-width:220px}
+td.flags{min-width:150px}
+tbody tr.prop td:first-child .caret{display:inline-block;width:14px;color:var(--muted);transition:transform .15s}
+tbody tr.prop.open td:first-child .caret{transform:rotate(90deg)}
+.r{white-space:nowrap}
+.r.bad{color:var(--alert);font-weight:600}
+.r.none{color:var(--muted)}
+.tag{display:inline-block;font-size:12.5px;font-weight:500;padding:2px 7px;border-radius:4px;background:var(--alertbg);color:var(--alert);margin:0 4px 3px 0;white-space:nowrap}
+.tag.ok{background:none;color:var(--muted);padding-left:0}
+.zero{color:var(--muted)}
+
+tr.detail > td{padding:4px 16px 20px 38px;background:var(--bg)}
+.dgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:980px}
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:4px 24px}
+@media (max-width:900px){tr.detail > td{padding-left:16px}}
+.dgrid table{font-size:14px;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+.dgrid th{padding:7px 10px;white-space:normal;line-height:1.2;vertical-align:bottom}
+.dgrid td:first-child{white-space:nowrap}
+.dgrid th.n{text-align:right}
+.dgrid td{padding:6px 10px}
+.dgrid tr.partial td{color:var(--muted);font-style:italic}
+.check{margin:0 0 14px}
+.check ul{margin:4px 0 0;padding-left:20px}
+.check li{margin-bottom:3px}
+.check p{margin:0;color:var(--muted);font-size:14px}
+.dlinks{font-size:14px;margin:10px 0 0}
+
+.sched td.d,.sched th.d{text-align:center;min-width:52px}
+.sched th.d small{display:block;font-weight:400}
+.sched td.d b{display:inline-block;min-width:26px;padding:2px 6px;border-radius:4px;background:var(--bar);font-weight:600}
+.sched tr.ag{cursor:pointer}
+.sched tr.ag:hover,.sched tr.ag.open{background:var(--bg)}
+.sched tr.ag td:first-child{font-weight:600;white-space:nowrap}
+.agenda{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px 20px;padding:4px 0 8px}
+.agenda h4{margin:0 0 4px;font-size:14px;color:var(--muted);font-weight:600}
+.agenda ul{list-style:none;margin:0;padding:0;font-size:14px}
+.agenda li{padding:3px 0;border-bottom:1px solid var(--line)}
+.agenda li span{color:var(--muted)}
+.gaps{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--alert);border-radius:8px;padding:12px 16px;margin-top:14px}
+.gaps h2{font-size:21px}
+.gaps ul{margin:6px 0 0;padding-left:20px;columns:2 260px;font-size:15px}
+.gaps li{margin-bottom:3px;break-inside:avoid}
+.gaps li span{color:var(--muted)}
+.linkbtn{font:inherit;font-size:15px;background:none;border:0;color:var(--accent);text-decoration:underline;cursor:pointer;padding:0;margin-top:6px}
+.rules{color:var(--muted);font-size:15px;max-width:80ch;margin-top:24px}
+.rules li{margin-bottom:4px}
+.empty{padding:24px;color:var(--muted);text-align:center}
+footer{margin-top:30px;color:var(--muted);font-size:14px}
+[hidden]{display:none !important}
+@media (prefers-reduced-motion: reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../">Guide Dashboards</a>
+  <h1>Lead to lease</h1>
+  <p class="sub" id="updated"></p>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" aria-controls="p-props" id="t-props">Properties</button>
+    <button role="tab" aria-selected="false" aria-controls="p-agents" id="t-agents">Showing schedules</button>
+  </div>
+
+  <section id="p-props" role="tabpanel" aria-labelledby="t-props">
+    <div class="controls">
+      <div class="seg" id="period" role="group" aria-label="Quick ranges"></div>
+      <div class="dates">
+        <label>From <input type="date" id="from"></label>
+        <label>to <input type="date" id="to"></label>
+      </div>
+      <label class="check"><input type="checkbox" id="vacOnly" checked> Only properties with vacancies</label>
+      <input type="search" id="q" placeholder="Find a property" aria-label="Find a property">
+      <input type="search" id="grp" list="groups" placeholder="Property group" aria-label="Property group">
+      <datalist id="groups"></datalist>
+    </div>
+    <p class="range" id="range"></p>
+    <p class="focus" id="focus" hidden></p>
+    <div class="funnel" id="funnel"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr id="head"></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <ul class="rules" id="rules"></ul>
+  </section>
+
+  <section id="p-agents" role="tabpanel" aria-labelledby="t-agents" hidden>
+    <div class="controls">
+      <input type="search" id="qa" placeholder="Find an agent or property" aria-label="Find an agent or property">
+    </div>
+    <p class="range" id="arange"></p>
+
+    <div id="gaps"></div>
+
+    <h2 style="margin-top:22px">Leasing agents</h2>
+    <p class="sub" style="font-size:15px;margin-bottom:10px">Showings booked for the next 7 days (scheduled, confirmed or awaiting confirmation) and each agent's showing schedule in AppFolio. Click an agent's row for their appointments.</p>
+    <div class="tablewrap">
+      <table class="sched">
+        <thead><tr id="ahead"></tr></thead>
+        <tbody id="arows"></tbody>
+      </table>
+    </div>
+    <p class="rules">Times are local to each property (Pacific for Washington, Mountain for Idaho). Booked showings are as of the morning refresh; anything booked later today shows up tomorrow. Completed showings use the dates picked on the Properties tab.</p>
+  </section>
+
+  <footer>Data from AppFolio through yesterday, refreshed each morning. Only counts are shown here; no prospect details.</footer>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDate = iso => new Date(iso + "T12:00:00").toLocaleDateString("en-US", {month:"short", day:"numeric"});
+const sum = a => a.reduce((x, y) => x + y, 0);
+
+/* What to check when a number is low (from the workbook's playbook) */
+const PLAYBOOK = {
+  leads: {title: "Low leads", items: [
+    ["Pricing", ["Complete a rent comp survey (HelloData.AI)"]],
+    ["Feed issues", ["Check Zillow and the websites for feed issues"]],
+    ["Issues with ads", ["Check the AppFolio ad is correct", "Photos or staged photos missing", "3D tours", "YouTube videos"]],
+  ]},
+  showings: {title: "Low showings", items: [
+    ["Agent availability", ["Check the agent's showing schedule"]],
+    ["Booking link", ["Try to book a tour as a prospect: Zillow, the website, GuidePM.com"]],
+  ]},
+  leases: {title: "Low leases", items: [
+    ["The property or area", ["Walk the property and the area", "Request a property inspection"]],
+    ["The agent", ["Run through a mock tour and ask common questions", "Shadow a showing", "Review tour feedback"]],
+  ]},
+};
+
+let state = {period: "last", from: "", to: "", vacOnly: true, q: "", sort: "attn", dir: "desc", open: new Set(), focus: null, group: null};
+
+/* Quick ranges set the From and To dates; any dates can be typed in */
+function periods(){
+  const W = DATA.full_weeks, n = DATA.weeks.length, wk = i => DATA.weeks[Math.max(0, i)];
+  // This week runs Monday through yesterday (hidden on Mondays, when there's nothing yet).
+  // 2, 4 and 6 weeks are that many full weeks plus this week, through yesterday.
+  const end = wk(n - 1)[1];
+  return [
+    ...(DATA.partial ? [{key: "now", label: "This week", from: wk(n - 1)[0], to: end}] : []),
+    {key: "2", label: "2 weeks", from: wk(W - 2)[0], to: end},
+    {key: "4", label: "4 weeks", from: wk(W - 4)[0], to: end},
+    {key: "6", label: "6 weeks", from: wk(W - 6)[0], to: end},
+  ];
+}
+const monday = iso => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.toISOString().slice(0, 10); };
+function curPeriod(){
+  // Every week that overlaps the chosen dates (a start date mid-week starts that Monday)
+  const idx = DATA.weeks.map((w, i) => i).filter(i => DATA.weeks[i][1] >= state.from && DATA.weeks[i][0] <= state.to);
+  return {key: state.period, idx: idx.length ? idx : [DATA.weeks.length - 1]};
+}
+const money = v => v == null ? "–" : "$" + Math.round(v).toLocaleString("en-US");
+function rentCell(p, idx){
+  const end = p.rent[idx[idx.length - 1]], before = idx[0] > 0 ? p.rent[idx[0] - 1] : p.rent[idx[0]];
+  if (end == null) return `<td class="n rent"><span class="zero">–</span></td>`;
+  const d = before == null ? 0 : end - before;
+  const note = d ? `<small class="${d < 0 ? "down" : "up"}">${d < 0 ? "down" : "up"} ${money(Math.abs(d))}</small>` : "";
+  return `<td class="n rent">${money(end)}${note}</td>`;
+}
+function unitRentAt(u, iso){
+  let v = u.start;
+  for (const [d, r] of u.changes) if (d <= iso) v = r;
+  return v;
+}
+function days(idx){
+  return sum(idx.map(i => {
+    const [a, b] = DATA.weeks[i];
+    return Math.round((new Date(b) - new Date(a)) / 86400000) + 1;
+  }));
+}
+
+/* Ratios as "x to 1" against the targets */
+function ratio(top, bottom, target, what){
+  // Short of target = fewer than one per full "target" of the step before it
+  // (e.g. 13 leads should give at least 2 showings at 6 to 1).
+  const bad = bottom < Math.floor(top / target);
+  if (!top && !bottom) return {v: null, bad, txt: "–"};
+  if (!bottom) return {v: Infinity, bad, txt: `no ${what}`};
+  return {v: top / bottom, bad, txt: `${(top / bottom).toFixed(1).replace(/\.0$/, "")} to 1`};
+}
+function stats(p, idx){
+  const T = DATA.targets, L = sum(idx.map(i => p.leads[i])), S = sum(idx.map(i => p.showings[i])), X = sum(idx.map(i => p.leases[i]));
+  const d = days(idx);
+  const flags = [];
+  if (L < T.leads_per_day * d) flags.push("leads");
+  const ls = ratio(L, S, T.leads_per_showing, "showings"), sx = ratio(S, X, T.showings_per_lease, "leases"), lx = ratio(L, X, T.leads_per_lease, "leases");
+  if (ls.bad) flags.push("showings");
+  if (sx.bad) flags.push("leases");
+  return {L, S, X, d, flags, ls, sx, lx};
+}
+const ratioCell = r => {
+  const cls = r.bad ? "bad" : r.v === null || r.v === Infinity ? "none" : "";
+  return `<td class="n"><span class="r ${cls}">${r.txt}</span></td>`;
+};
+
+/* ---------------- Properties ---------------- */
+const COLS = [
+  ["name", "Property", false], ["vacant", "Vacancies", true], ["rent", "Advertised rent", true], ["L", "Leads", true], ["S", "Showings", true], ["X", "Leases", true],
+  ["ls", "Leads per showing", true], ["sx", "Showings per lease", true], ["lx", "Leads per lease", true], ["attn", "Needs attention", false],
+];
+
+function renderHead(){
+  $("#head").innerHTML = COLS.map(([k, label, n]) =>
+    `<th class="${n ? "n" : ""}"><button data-k="${k}" ${state.sort === k ? `data-dir="${state.dir}"` : ""}>${label}</button></th>`).join("");
+}
+
+function renderProps(){
+  const per = curPeriod(), idx = per.idx, T = DATA.targets;
+  const [a] = DATA.weeks[idx[0]], [, b] = DATA.weeks[idx[idx.length - 1]];
+  const partial = DATA.partial && idx.includes(DATA.weeks.length - 1);
+  $("#range").textContent = `${fmtDate(a)} – ${fmtDate(b)}${partial ? " (this week runs through yesterday)" : ""}. Weeks run Monday to Sunday. Advertised rent is the average across each property's units at the end of the range, with the change since the range started.`;
+
+  const q = state.q.toLowerCase();
+  const inGroup = state.group ? new Set(state.group[1]) : null;
+  let list = DATA.properties
+    .filter(p => !inGroup || inGroup.has(p.id))
+    .filter(p => !state.vacOnly || p.vacant > 0)
+    .filter(p => !q || p.name.toLowerCase().includes(q))
+    .map(p => ({p, s: stats(p, idx)}));
+
+  // Funnel: the property opened last, or every property shown
+  const fx = state.focus && list.find(x => x.p.id === state.focus);
+  const fl = fx ? [fx] : list;
+  $("#focus").hidden = !fx;
+  if (fx) $("#focus").innerHTML = `Numbers for <b>${esc(fx.p.name)}</b>.<button type="button" id="showAll">Show all properties</button>`;
+  const L = sum(fl.map(x => x.s.L)), S = sum(fl.map(x => x.s.S)), X = sum(fl.map(x => x.s.X)), V = sum(fl.map(x => x.p.vacant));
+  const conv = (r, t, what) => r.v === null ? `<span class="conv">–</span>` :
+    `<span class="conv ${r.bad ? "bad" : "good"}">${r.txt} <span style="font-weight:400;color:var(--muted)">(target ${t} to 1 ${what})</span></span>`;
+  const lr = ratio(L, S, T.leads_per_showing, "showings"), sr = ratio(S, X, T.showings_per_lease, "leases"), xr = ratio(L, X, T.leads_per_lease, "leases");
+  $("#funnel").innerHTML = `
+    <div class="stage"><b>${V}</b><span>vacancies now</span><span class="conv">${fx ? `${fx.p.unrented} unrented` : `${list.length} ${list.length === 1 ? "property" : "properties"}${state.group ? ` in ${esc(state.group[0])}` : ""}`}</span></div>
+    <div class="stage"><b>${L}</b><span>leads</span>${conv(xr, T.leads_per_lease, "lead to lease")}</div>
+    <div class="stage"><b>${S}</b><span>completed showings</span>${conv(lr, T.leads_per_showing, "leads to showing")}</div>
+    <div class="stage"><b>${X}</b><span>leases countersigned</span>${conv(sr, T.showings_per_lease, "showings to lease")}</div>`;
+
+  // Sort
+  const key = state.sort, dir = state.dir === "asc" ? 1 : -1;
+  const val = x => key === "name" ? x.p.name.toLowerCase() : key === "vacant" ? x.p.vacant :
+    key === "rent" ? (x.p.rent[idx[idx.length - 1]] ?? -1) : key === "attn" ? x.s.flags.length * 1000 + x.p.vacant : ["ls", "sx", "lx"].includes(key) ? (x.s[key].v ?? -1) : x.s[key];
+  list.sort((m, n) => { const A = val(m), B = val(n); return (A < B ? -1 : A > B ? 1 : 0) * dir || m.p.name.localeCompare(n.p.name); });
+
+  if (!list.length){
+    $("#rows").innerHTML = `<tr><td colspan="${COLS.length}" class="empty">No properties match. Clear the search${state.vacOnly ? " or include properties with no vacancies" : ""}.</td></tr>`;
+    return;
+  }
+  const label = {leads: "Low leads", showings: "Low showings", leases: "Low leases"};
+  $("#rows").innerHTML = list.map(({p, s}) => {
+    const open = state.open.has(p.id);
+    const z = n => n ? n : `<span class="zero">0</span>`;
+    return `<tr class="prop${open ? " open" : ""}" data-id="${esc(p.id)}" tabindex="0" aria-expanded="${open}">
+      <td><span class="caret" aria-hidden="true">›</span> ${esc(p.name)}</td>
+      <td class="n">${z(p.vacant)}</td>${rentCell(p, idx)}<td class="n">${z(s.L)}</td><td class="n">${z(s.S)}</td><td class="n">${z(s.X)}</td>
+      ${ratioCell(s.ls)}${ratioCell(s.sx)}${ratioCell(s.lx)}
+      <td class="flags">${s.flags.length ? s.flags.map(f => `<span class="tag">${label[f]}</span>`).join("") : `<span class="tag ok">On target</span>`}</td>
+    </tr>` + (open ? `<tr class="detail"><td colspan="${COLS.length}">${detail(p, s, idx)}</td></tr>` : "");
+  }).join("");
+}
+
+function detail(p, s, idx){
+  const T = DATA.targets, n = DATA.weeks.length;
+  const pct = (a, b) => b ? `${Math.round(100 * a / b)}%` : "–";
+  const weeks = idx.map(i => {
+    const [a, b] = DATA.weeks[i], w = stats(p, [i]), partial = DATA.partial && i === n - 1;
+    return `<tr class="${partial ? "partial" : ""}"><td>${fmtDate(a)} – ${fmtDate(b)}${partial ? " (so far)" : ""}</td><td class="n">${money(p.rent[i])}</td>
+      <td class="n">${w.L}</td><td class="n">${w.S}</td><td class="n">${w.X}</td>
+      <td class="n">${pct(w.S, w.L)}</td><td class="n">${pct(w.X, w.S)}</td><td class="n">${pct(w.X, w.L)}</td>
+      <td>${partial ? "" : w.flags.map(f => `<span class="tag">${PLAYBOOK[f].title}</span>`).join("")}</td></tr>`;
+  }).join("");
+  const checks = s.flags.length ? s.flags.map(f => `<div class="check"><h3>${PLAYBOOK[f].title}</h3><ul>${
+      PLAYBOOK[f].items.map(([h, xs]) => `<li><b>${esc(h)}:</b> ${xs.map(esc).join("; ")}</li>`).join("")}</ul></div>`).join("")
+    : `<div class="check"><h3>On target</h3><p>Nothing to check for this period.</p></div>`;
+  const src = p.sources && p.sources.length ? `<div class="check"><h3>Where leads came from</h3><p>Last ${DATA.full_weeks} weeks: ${p.sources.map(([k, v]) => `${esc(k)} ${v}`).join(", ")}</p></div>` : "";
+  const vac = `${p.vacant} ${p.vacant === 1 ? "vacancy" : "vacancies"}${p.vacant ? `, ${p.unrented} unrented` : ""}`;
+  return `<div class="dgrid">
+    <div>
+      <h3 style="margin-top:12px">Week by week</h3>
+      <div class="tablewrap" style="border:0"><table>
+        <thead><tr><th>Week</th><th class="n">Avg advertised rent</th><th class="n">Leads</th><th class="n">Showings</th><th class="n">Leases</th><th class="n">Leads to showings</th><th class="n">Showings to leases</th><th class="n">Lead to lease</th><th></th></tr></thead>
+        <tbody>${weeks}</tbody>
+      </table></div>
+      <p class="dlinks">${esc(vac)}. <a href="${esc(DATA.base_url)}properties/${encodeURIComponent(p.id)}" target="_blank" rel="noopener">Open in AppFolio</a></p>
+    </div>
+    <div class="checks">${checks}${src}</div>
+    ${unitRents(p, idx)}
+    ${bookedHtml(p)}
+  </div>`;
+}
+
+function bookedHtml(p){
+  const xs = bookedFor(p.id);
+  return `<div><h3>Showings booked, next ${SC().days} days</h3>${xs.length ? `<ul style="margin:4px 0 0;padding-left:20px;font-size:14px">${xs.map(x =>
+    `<li>${dayLabel(x[3].slice(0, 10))} ${fmtDate(x[3].slice(0, 10))}, ${timeLabel(x[3])}: ${esc(x[2])} with ${esc(x[0] || "unassigned")} <span class="zero">(${esc(x[4])})</span></li>`).join("")}</ul>`
+    : `<p class="sub" style="font-size:14px">Nothing booked.${p.vacant ? " With vacant units, check the agent's availability and the booking link." : ""}</p>`}</div>`;
+}
+
+/* Each unit's advertised rent over the range: units whose rent changed, and units vacant now */
+const dayBefore = iso => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); };
+function unitRents(p, idx){
+  const from = DATA.weeks[idx[0]][0], to = DATA.weeks[idx[idx.length - 1]][1];
+  const vac = new Set(p.vacant_units || []);
+  const rows = (p.units || []).map(u => {
+    const changes = u.changes.filter(([d]) => d >= from && d <= to);
+    return {u, changes, start: unitRentAt(u, dayBefore(from)), end: unitRentAt(u, to), vac: vac.has(u.u)};
+  }).filter(x => x.changes.length || x.vac);
+  if (!rows.length) return `<div><h3>Advertised rent by unit</h3><p class="sub" style="font-size:14px">No rent changes in this range and no vacant units.</p></div>`;
+  rows.sort((a, b) => b.vac - a.vac || a.u.u.localeCompare(b.u.u, undefined, {numeric: true}));
+  const body = rows.map(x => `<tr><td>${esc(x.u.u)}${x.vac ? `<span class="vtag">Vacant now</span>` : ""}</td>
+      <td class="n">${money(x.start)}</td><td class="n">${money(x.end)}</td>
+      <td class="chg">${x.changes.length ? x.changes.map(([d, r]) => `${fmtDate(d)}: ${money(r)}`).join(", ") : "No change"}</td></tr>`).join("");
+  return `<div><h3>Advertised rent by unit</h3>
+    <p class="sub" style="font-size:14px;margin-bottom:6px">Units whose rent changed between ${fmtDate(from)} and ${fmtDate(to)}, and units vacant now.</p>
+    <div class="tablewrap" style="border:0"><table class="utable"><thead><tr><th>Unit</th><th class="n">At start</th><th class="n">At end</th><th>Changes in range</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+}
+
+function renderRules(){
+  const T = DATA.targets;
+  $("#rules").innerHTML = [
+    `Targets: ${T.leads_per_showing} leads to 1 showing, ${T.showings_per_lease} showings to 1 lease, ${T.leads_per_lease} leads to 1 lease. Red ratios are worse than target.`,
+    `Low leads means fewer than ${T.leads_per_day} leads a day for the period. Low showings means fewer than 1 showing for every ${T.leads_per_showing} leads. Low leases means fewer than 1 lease for every ${T.showings_per_lease} showings.`,
+    `Leads are guest card inquiries by date received. Showings are completed showings. Leases are counted on the countersigned date${DATA.renewals_counted ? "" : ", not counting renewals"}. Vacancies are units vacant or on notice as of today, like the Unit Vacancy Detail report.`,
+    `Click a property for its week-by-week numbers and what to check.`,
+  ].map(x => `<li>${esc(x)}</li>`).join("");
+}
+
+/* ---------------- Agents ---------------- */
+const SC = () => DATA.schedule || {from: DATA.today, days: 7, items: []};
+const propName = id => (DATA.properties.find(p => p.id === id) || {}).name || "";
+function schedDays(){
+  const out = [], d = new Date(SC().from + "T12:00:00");
+  for (let i = 0; i < SC().days; i++){ out.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1); }
+  return out;
+}
+const dayLabel = iso => new Date(iso + "T12:00:00").toLocaleDateString("en-US", {weekday: "short"});
+const timeLabel = t => new Date(t + ":00").toLocaleTimeString("en-US", {hour: "numeric", minute: "2-digit"});
+function bookedFor(pid){ return SC().items.filter(x => x[1] === pid); }
+
+let openAgents = new Set(), showAllGaps = false;
+function renderAgents(){
+  const days = schedDays(), q = $("#qa").value.trim().toLowerCase();
+  const idx = curPeriod().idx;
+  const [a] = DATA.weeks[idx[0]], [, b] = DATA.weeks[idx[idx.length - 1]];
+  $("#arange").textContent = `Booked showings ${fmtDate(days[0])} – ${fmtDate(days[days.length - 1])}. Completed showings ${fmtDate(a)} – ${fmtDate(b)}.`;
+
+  // Vacant properties with nothing booked: the likeliest availability or booking-link problems
+  const bookedProps = new Set(SC().items.map(x => x[1]));
+  const gaps = DATA.properties.filter(p => p.vacant > 0 && !bookedProps.has(p.id))
+    .filter(p => !q || p.name.toLowerCase().includes(q))
+    .sort((x, y) => y.vacant - x.vacant);
+  $("#gaps").innerHTML = gaps.length ? `<div class="gaps"><h2>Vacancies with no showings booked</h2>
+    <p class="sub" style="font-size:15px">${gaps.length} ${gaps.length === 1 ? "property has" : "properties have"} vacant units and nothing on the calendar for the next ${SC().days} days. Check the agent's availability and try booking a tour as a prospect.</p>
+    <ul>${(showAllGaps ? gaps : gaps.slice(0, 12)).map(p => `<li>${esc(p.name)} <span>${p.vacant} ${p.vacant === 1 ? "vacancy" : "vacancies"}</span></li>`).join("")}</ul>
+    ${gaps.length > 12 ? `<button type="button" class="linkbtn" id="moreGaps">${showAllGaps ? "Show fewer" : `Show all ${gaps.length}`}</button>` : ""}</div>` : "";
+
+  // Agent grid
+  $("#ahead").innerHTML = `<th style="padding:10px 12px">Agent</th>` + days.map(d => `<th class="d" style="padding:10px 6px">${dayLabel(d)}<small>${fmtDate(d)}</small></th>`).join("") +
+    `<th class="n" style="padding:10px 12px;text-align:right">Booked</th><th class="n" style="padding:10px 12px;text-align:right">Completed</th><th style="padding:10px 12px">Showing schedule</th>`;
+  const rows = DATA.agents.map(ag => {
+    const items = SC().items.filter(x => x[0] === ag.name);
+    const done = sum(idx.map(i => ag.showings[i] || 0));
+    return {ag, items, done};
+  }).filter(r => r.items.length || r.done || r.ag.id)
+    .filter(r => !q || r.ag.name.toLowerCase().includes(q) || r.items.some(x => propName(x[1]).toLowerCase().includes(q)))
+    .sort((x, y) => y.items.length - x.items.length || y.done - x.done || x.ag.name.localeCompare(y.ag.name));
+  const cols = days.length + 4;
+  $("#arows").innerHTML = rows.length ? rows.map(({ag, items, done}) => {
+    const open = openAgents.has(ag.name);
+    const cells = days.map(d => { const n = items.filter(x => x[3].startsWith(d)).length; return `<td class="d">${n ? `<b>${n}</b>` : `<span class="zero">·</span>`}</td>`; }).join("");
+    const agenda = open ? `<tr><td colspan="${cols}" style="background:var(--bg)"><div class="agenda">${days.map(d => {
+        const xs = items.filter(x => x[3].startsWith(d));
+        return xs.length ? `<div><h4>${dayLabel(d)} ${fmtDate(d)}</h4><ul>${xs.map(x => `<li>${timeLabel(x[3])} ${esc(propName(x[1]))} ${esc(x[2])} <span>${esc(x[4])}${x[5].toLowerCase() === "scheduled" ? "" : ", " + esc(x[5].toLowerCase())}</span></li>`).join("")}</ul></div>` : "";
+      }).join("") || `<p class="sub">Nothing booked.</p>`}</div></td></tr>` : "";
+    return `<tr class="ag${open ? " open" : ""}" data-a="${esc(ag.name)}" tabindex="0" aria-expanded="${open}"><td>${esc(ag.name || "Unassigned")}</td>${cells}
+      <td class="n">${items.length || `<span class="zero">0</span>`}</td><td class="n">${done || `<span class="zero">0</span>`}</td>
+      <td>${ag.id ? `<a href="${esc(DATA.base_url)}prospect_showings/agents/${encodeURIComponent(ag.id)}" target="_blank" rel="noopener">Open in AppFolio</a>` : `<span class="zero">No AppFolio ID</span>`}</td></tr>${agenda}`;
+  }).join("") : `<tr><td colspan="${cols}" class="empty">No agents match.</td></tr>`;
+}
+
+/* ---------------- Wiring ---------------- */
+function init(){
+  $("#updated").textContent = `Updated ${DATA.generated}`.replace(/\.?$/, ".");
+  const minD = DATA.weeks[0][0], maxD = DATA.weeks[DATA.weeks.length - 1][1];
+  [$("#from"), $("#to")].forEach(el => { el.min = minD; el.max = maxD; });
+  const setRange = (key, from, to) => {
+    state.period = key; state.from = from; state.to = to;
+    $("#from").value = from; $("#to").value = to;
+    [...$("#period").children].forEach(x => x.setAttribute("aria-pressed", x.dataset.p === key));
+    renderProps();
+    renderAgents();
+  };
+  $("#period").innerHTML = periods().map(p => `<button data-p="${p.key}" aria-pressed="false">${p.label}</button>`).join("");
+  $("#period").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const p = periods().find(x => x.key === b.dataset.p);
+    setRange(p.key, p.from, p.to);
+  });
+  const typed = () => {
+    let f = $("#from").value || minD, t = $("#to").value || maxD;
+    f = monday(f < minD ? minD : f > maxD ? maxD : f);
+    if (t < f) t = f;
+    setRange("", f, t > maxD ? maxD : t);
+  };
+  $("#from").addEventListener("change", typed);
+  $("#to").addEventListener("change", typed);
+  const def = periods().find(p => p.key === "4");
+  $("#vacOnly").addEventListener("change", e => { state.vacOnly = e.target.checked; renderProps(); });
+  $("#q").addEventListener("input", e => { state.q = e.target.value; renderProps(); });
+  // Property groups from AppFolio: type to search, pick one to filter; clear the box for all
+  const groups = DATA.groups || [];
+  if (!groups.length) $("#grp").hidden = true;
+  $("#groups").innerHTML = groups.map(([n, ids]) => `<option value="${esc(n)}">${ids.length} properties</option>`).join("");
+  $("#grp").addEventListener("input", e => {
+    const v = e.target.value.trim().toLowerCase();
+    const g = groups.find(([n]) => n.toLowerCase() === v) || null;
+    if (g || !v){ state.group = g; state.focus = null; state.open.clear(); renderProps(); }
+  });
+  $("#head").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const k = b.dataset.k;
+    state.dir = state.sort === k ? (state.dir === "asc" ? "desc" : "asc") : (k === "name" ? "asc" : "desc");
+    state.sort = k;
+    renderHead(); renderProps();
+  });
+  const toggle = tr => {
+    const id = tr.dataset.id;
+    if (state.open.has(id)){
+      state.open.delete(id);
+      if (state.focus === id) state.focus = [...state.open].pop() || null;
+    } else {
+      state.open.add(id);
+      state.focus = id;
+    }
+    renderProps();
+    const again = document.querySelector(`tr.prop[data-id="${CSS.escape(id)}"]`);
+    if (again) again.focus();
+  };
+  $("#rows").addEventListener("click", e => { const tr = e.target.closest("tr.prop"); if (tr && !e.target.closest("a")) toggle(tr); });
+  $("#rows").addEventListener("keydown", e => {
+    const tr = e.target.closest("tr.prop");
+    if (tr && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); toggle(tr); }
+  });
+  $("#focus").addEventListener("click", e => {
+    if (e.target.id !== "showAll") return;
+    state.focus = null; state.open.clear(); renderProps();
+  });
+  $("#qa").addEventListener("input", renderAgents);
+  $("#gaps").addEventListener("click", e => { if (e.target.id === "moreGaps"){ showAllGaps = !showAllGaps; renderAgents(); } });
+  const toggleAgent = tr => { const n = tr.dataset.a; openAgents.has(n) ? openAgents.delete(n) : openAgents.add(n); renderAgents(); };
+  $("#arows").addEventListener("click", e => { const tr = e.target.closest("tr.ag"); if (tr && !e.target.closest("a")) toggleAgent(tr); });
+  $("#arows").addEventListener("keydown", e => { const tr = e.target.closest("tr.ag"); if (tr && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); toggleAgent(tr); } });
+  document.querySelectorAll(".tabs button").forEach(t => t.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach(x => {
+      const on = x === t; x.setAttribute("aria-selected", on);
+      document.getElementById(x.getAttribute("aria-controls")).hidden = !on;
+    });
+  }));
+  renderHead(); setRange(def.key, def.from, def.to); renderRules(); renderAgents();
+}
+
+if (!DATA){
+  $("#updated").textContent = "No data yet. The page fills in after the next refresh.";
+  document.querySelectorAll("section").forEach(s => s.hidden = true);
+} else init();
+</script>
+</body>
+</html>
