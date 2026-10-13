@@ -61,7 +61,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-09 competition v11 (manager reassignments)"
+VERSION = "2026-10-09 competition v12 (Colin Ward to Vanessa Reed)"
 HERE = Path(__file__).resolve().parent
 WO_TEMPLATE = HERE / "workordercomp_template.html"
 RN_TEMPLATE = HERE / "renewalcomp_template.html"
@@ -90,6 +90,7 @@ RN_PRIZE = "$1,000"
 # Site managers in AppFolio whose properties count for someone else in the competition.
 MANAGER_REASSIGN = {
     "Alex Barnia": "Emma Ottey",
+    "Colin Ward": "Vanessa Reed",
 }
 
 # Status codes AppFolio uses on the work order report that we already know are open.
