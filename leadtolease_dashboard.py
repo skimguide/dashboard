@@ -1,12 +1,14 @@
 """
 Lead to Lease dashboard (replaces Lead_to_Lease_Report.xlsm).
 
-Pulls seven AppFolio reports (Showings twice: past and booked) through the Reports API (v2), counts them per property per
+Pulls eight AppFolio reports (Showings twice: past and booked) through the Reports API (v2), counts them per property per
 week, and writes _site/leadtolease/index.html for GitHub Pages. Only counts are published:
 no prospect names, emails or phone numbers leave this script.
 
   Leads     Guest Card Inquiries, by Inquiry Received date (all sources and statuses)
   Showings  Showings with status Completed, by Showing Time
+  Apps      Rental Applications, by date received; one per application group (a household
+            applying together counts once) when AppFolio sends the group ID
   Leases    Lease History, by Countersigned Date; renewals left out (COUNT_RENEWALS)
   Vacant    Unit Vacancy Detail, units listed right now
   Property  Property Directory (active properties)
@@ -63,7 +65,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-09 lead to lease v6 (agent schedule links)"
+VERSION = "2026-10-15 lead to lease v9 (rent changes by time, lead sources by week)"
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "leadtolease_template.html"
 AGENTS_CSV = HERE / "leasing_agents.csv"      # optional: name,leasing_id rows the report misses
@@ -90,6 +92,8 @@ FIELDS = {
     "state":       ["property_state", "state"],
     "signed":      ["countersigned_date", "countersigned_on", "countersigned_at"],
     "renewal":     ["renewal", "is_renewal"],
+    "app_received": ["received", "received_on", "application_received", "submitted_on", "submitted_at", "created_at"],
+    "app_group":   ["rental_application_group_id", "application_group_id", "group_id"],
     "unit_status": ["unit_status", "status"],
     "short_name":  ["property_name", "name"],
     "unit":        ["unit", "unit_name"],
@@ -231,6 +235,17 @@ def to_date(v):
     return None
 
 
+def to_dt(v):
+    """A timestamp from AppFolio (2026-09-09T22:37:13Z) as an aware datetime."""
+    s = str(v or "").strip()
+    m = re.match(r"(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(Z|[+-]\d{2}:?\d{2})?", s)
+    if m:
+        d = datetime.fromisoformat(f"{m[1]}T{m[2]}" + ("+00:00" if m[3] in (None, "Z") else m[3]))
+        return d
+    d = to_date(s)
+    return datetime(d.year, d.month, d.day, tzinfo=TZ) if d else None
+
+
 def month_text(d):
     return d.strftime("%b %Y")
 
@@ -298,14 +313,18 @@ def build(c, today):
     props = Properties(fetch(c, "property_directory", {"property_visibility": "active"}))
     log.info("  %s active properties", len(props.props))
 
-    counts = {pid: {"leads": [0] * len(weeks), "showings": [0] * len(weeks), "leases": [0] * len(weeks),
+    counts = {pid: {"leads": [0] * len(weeks), "showings": [0] * len(weeks), "leases": [0] * len(weeks), "apps": [0] * len(weeks),
                     "vacant": 0, "unrented": 0, "sources": {}, "vacant_units": []} for pid in props.props}
-    unmatched = {"leads": 0, "showings": 0, "leases": 0, "vacant": 0}
-    outside = {"leads": 0, "showings": 0, "leases": 0}
+    unmatched = {"leads": 0, "showings": 0, "apps": 0, "leases": 0, "vacant": 0}
+    outside = {"leads": 0, "showings": 0, "apps": 0, "leases": 0}
 
     # Leads
     log.info("Guest Card Inquiries (leads)")
-    for r in by_week(c, "guest_card_inquiries", "received_on", first, last):
+    # The API only sends prequalified, active and waitlisted guest cards unless asked for all
+    # statuses; the AppFolio report (and the old workbook) counts every status.
+    lead_filters = {"guest_card_statuses": ["all"], "filter_date_range_by": "inquiry",
+                    "columns": ["property", "property_id", "received", "status", "source"]}
+    for r in by_week(c, "guest_card_inquiries", "received_on", first, last, lead_filters):
         i = week_index(weeks, to_date(pick(r, FIELDS["received"])))
         if i is None:
             outside["leads"] += 1
@@ -315,9 +334,9 @@ def build(c, today):
             unmatched["leads"] += 1
             continue
         counts[pid]["leads"][i] += 1
-        src = norm(pick(r, FIELDS["source"]))[:40]
-        if src and i < WEEKS:
-            counts[pid]["sources"][src] = counts[pid]["sources"].get(src, 0) + 1
+        # Every lead gets a source (blank ones as "No source"), so sources add up to the leads
+        src = norm(pick(r, FIELDS["source"]))[:40] or "No source"
+        counts[pid]["sources"].setdefault(src, [0] * len(weeks))[i] += 1
 
     # Showings (completed only), and showings per agent
     log.info("Showings")
@@ -341,18 +360,42 @@ def build(c, today):
         counts[pid]["showings"][i] += 1
     log.info("  showing statuses: %s", statuses)
 
-    # Leases, by countersigned date. Lease History filters by lease start month, so pull
-    # leases starting from a few months before the first week to a year out.
+    # Applications, by date received
+    log.info("Rental Applications")
+    groups_seen = set()
+    app_filters = {"rental_application_statuses": ["all"],
+                   "rental_applications_filter_date_range_by": "Rental Application Received Date",
+                   "columns": ["property_name", "property_id", "received", "status", "rental_application_group_id"]}
+    for r in by_week(c, "rental_applications", "received_on", first, last, app_filters):
+        i = week_index(weeks, to_date(pick(r, FIELDS["app_received"])))
+        if i is None:
+            outside["apps"] += 1
+            continue
+        g = str(pick(r, FIELDS["app_group"]) or "").strip()
+        if g:
+            if g in groups_seen:
+                continue
+            groups_seen.add(g)
+        pid = props.find(r)
+        if not pid:
+            unmatched["apps"] += 1
+            continue
+        counts[pid]["apps"][i] += 1
+    log.info("  counted by application group: %s", "yes" if groups_seen else "no group ID; one per row")
+
+    # Leases, by countersigned date: Lease History filtered by countersigned month (YYYY-MM),
+    # one month per request so no request comes near AppFolio's 5,000-row page.
     log.info("Lease History (leases)")
-    lease_body = {"start_on_from": month_text(first - timedelta(days=120)),
-                  "start_on_to": month_text(today + timedelta(days=365))}
-    forced = os.environ.get("APPFOLIO_LEASE_FILTERS", "").strip()
-    if forced:
-        lease_body = json.loads(forced)
-    leases = fetch(c, "lease_history", lease_body, soft=True)
-    if leases is None:
-        log.info("  lease_history didn't accept %s; pulling without a date range", lease_body)
-        leases = fetch(c, "lease_history", {})
+    leases, m = [], date(first.year, first.month, 1)
+    while m <= last:
+        month = m.strftime("%Y-%m")
+        got = fetch(c, "lease_history", {"lease_history_filter_by": "Lease Countersigned Date",
+                                         "start_on_from": month, "start_on_to": month,
+                                         "columns": ["property", "property_name", "property_id", "countersigned_date",
+                                                     "renewal", "status"]})
+        log.info("  lease_history countersigned %s: %s rows", month, len(got))
+        leases.extend(got)
+        m = date(m.year + (m.month == 12), m.month % 12 + 1, 1)
     renewals = 0
     for r in leases:
         i = week_index(weeks, to_date(pick(r, FIELDS["signed"])))
@@ -390,10 +433,9 @@ def build(c, today):
     out_props = []
     for pid, p in props.props.items():
         k = counts[pid]
-        top = sorted(k["sources"].items(), key=lambda x: -x[1])[:5]
         out_props.append({"id": pid, "name": p["name"], "vacant": k["vacant"], "unrented": k["unrented"],
-                          "leads": k["leads"], "showings": k["showings"], "leases": k["leases"],
-                          "sources": top, "vacant_units": sorted(k["vacant_units"]),
+                          "leads": k["leads"], "showings": k["showings"], "apps": k["apps"], "leases": k["leases"],
+                          "sources": k["sources"], "vacant_units": sorted(k["vacant_units"]),
                           "rent": rents.get(pid, {}).get("avg", [None] * len(weeks)),
                           "units": rents.get(pid, {}).get("units", [])})
     out_props.sort(key=lambda p: p["name"].lower())
@@ -435,33 +477,42 @@ def rent_history(c, props, weeks):
             rent = float(str(rent).replace(",", "").replace("$", ""))
         except ValueError:
             continue
-        a = to_date(pick(r, FIELDS["approved"]))
+        a = to_dt(pick(r, FIELDS["approved"]))
         if not pid or rent <= 0 or not a:
             continue
         uid = str(pick(r, FIELDS["unit_id"]) or pick(r, FIELDS["unit"]))
         by_unit.setdefault((pid, uid), {"unit": norm(pick(r, FIELDS["unit"])), "recs": []})["recs"].append(
-            (a, to_date(pick(r, FIELDS["expired"])), rent))
+            (a, to_dt(pick(r, FIELDS["expired"])), rent))
     out = {}
+    end_of = lambda d: datetime(d.year, d.month, d.day, 23, 59, 59, tzinfo=TZ)
     for (pid, _), u in by_unit.items():
-        recs = sorted(u["recs"], key=lambda x: x[0])
-        def at(d):
-            live = [x for x in recs if x[0] <= d and (x[1] is None or x[1] > d)]
-            return live[-1][2] if live else None
+        # Order by the full approval time, not just the day: a rent is often changed several
+        # times within minutes, and only the last change stands. On an exact tie, the record
+        # that was superseded (expired at that moment) comes first.
+        recs = sorted(u["recs"], key=lambda x: (x[0], x[1] is None, x[1] or x[0]))
+        def at(moment):
+            v = None
+            for when, _, rent in recs:
+                if when > moment:
+                    break
+                v = rent
+            return v
         p = out.setdefault(pid, {"sums": [[0.0, 0] for _ in weeks], "units": []})
         for i, (_, end) in enumerate(weeks):
-            v = at(end)
+            v = at(end_of(end))
             if v is not None:
                 p["sums"][i][0] += v
                 p["sums"][i][1] += 1
-        # Rent in effect at the start of the history, then each change after it
-        # (re-approvals at the same rent aren't changes, so they're dropped)
-        start = at(first - timedelta(days=1))
+        # Rent at the start of the history, then the rent at the end of each day it changed
+        # (several changes in one day count as one, at the day's final rent)
+        start = at(end_of(first - timedelta(days=1)))
+        days = sorted({w.astimezone(TZ).date() for w, _, _ in recs if w.astimezone(TZ).date() >= first})
         hist, prev = [], start
-        for x in recs:
-            if x[0] >= first and x[2] != prev:
-                hist.append([x[0].isoformat(), x[2]])
-            if x[0] >= first:
-                prev = x[2]
+        for d in days:
+            v = at(end_of(d))
+            if v != prev:
+                hist.append([d.isoformat(), v])
+                prev = v
         if hist or start is not None:
             p["units"].append({"u": u["unit"] or "(no unit)", "start": start, "changes": hist})
     for p in out.values():
@@ -568,9 +619,12 @@ def inspect(c, today):
     d1 = today - timedelta(days=6)
     tries = [
         ("property_directory", {"property_visibility": "active"}),
-        ("guest_card_inquiries", {"received_on_from": d1.isoformat(), "received_on_to": today.isoformat()}),
+        ("guest_card_inquiries", {"received_on_from": d1.isoformat(), "received_on_to": today.isoformat(),
+                                  "guest_card_statuses": ["all"]}),
         ("showings", {"showing_date_from": d1.isoformat(), "showing_date_to": today.isoformat()}),
-        ("lease_history", {"start_on_from": month_text(today - timedelta(days=60)), "start_on_to": month_text(today)}),
+        ("rental_applications", {"received_on_from": d1.isoformat(), "received_on_to": today.isoformat()}),
+        ("lease_history", {"lease_history_filter_by": "Lease Countersigned Date",
+                           "start_on_from": today.strftime("%Y-%m"), "start_on_to": today.strftime("%Y-%m")}),
         ("unit_vacancy", {"unit_visibility": "active"}),
         ("property_group_directory", {"property_visibility": "active"}),
         ("leasing_funnel_performance", {}),

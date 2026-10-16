@@ -64,7 +64,7 @@ input[type=search]{font:inherit;font-size:15px;padding:8px 10px;border:1px solid
 .focus{margin:16px 0 -8px;font-size:15px}
 .focus b{font-weight:600}
 .focus button{font:inherit;font-size:15px;background:none;border:0;color:var(--accent);text-decoration:underline;cursor:pointer;padding:0;margin-left:6px}
-.funnel{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:18px 0 26px;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.funnel{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin:18px 0 26px;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .stage{padding:14px 18px 16px;border-left:1px solid var(--line);position:relative}
 .stage:first-child{border-left:0}
 .stage b{display:block;font:700 40px/1 var(--cond)}
@@ -72,24 +72,24 @@ input[type=search]{font:inherit;font-size:15px;padding:8px 10px;border:1px solid
 .stage .conv{display:block;margin-top:8px;font-size:14px}
 .conv.bad{color:var(--alert);font-weight:600}
 .conv.good{color:var(--ok);font-weight:600}
-@media (max-width:700px){.funnel{grid-template-columns:1fr 1fr}.stage:nth-child(3){border-left:0}.stage:nth-child(n+3){border-top:1px solid var(--line)}}
+@media (max-width:900px){.funnel{grid-template-columns:1fr 1fr}.stage{border-left:0;border-top:1px solid var(--line)}.stage:nth-child(even){border-left:1px solid var(--line)}.stage:nth-child(-n+2){border-top:0}}
 
 .tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
 table{border-collapse:collapse;width:100%;font-size:15px}
 th{text-align:left;font-weight:600;color:var(--muted);padding:0;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface)}
-th button{all:unset;cursor:pointer;display:block;padding:10px 10px;white-space:normal;line-height:1.2;max-width:110px}
+th button{all:unset;cursor:pointer;display:block;padding:10px 8px;white-space:normal;line-height:1.2;max-width:96px}
 th:first-child button,th:last-child button{max-width:none}
 th button:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 th button[data-dir]::after{content:" ▾";font-size:12px}
 th button[data-dir="asc"]::after{content:" ▴"}
 th.n button,td.n{text-align:right}
 th.n button{margin-left:auto}
-td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 td.n{font-variant-numeric:tabular-nums}
 tbody tr.prop{cursor:pointer}
 tbody tr.prop:hover{background:var(--bg)}
 tbody tr.prop.open{background:var(--bg)}
-tbody tr.prop td:first-child{font-weight:600;min-width:220px}
+tbody tr.prop td:first-child{font-weight:600;min-width:170px}
 td.flags{min-width:150px}
 tbody tr.prop td:first-child .caret{display:inline-block;width:14px;color:var(--muted);transition:transform .15s}
 tbody tr.prop.open td:first-child .caret{transform:rotate(90deg)}
@@ -101,7 +101,7 @@ tbody tr.prop.open td:first-child .caret{transform:rotate(90deg)}
 .zero{color:var(--muted)}
 
 tr.detail > td{padding:4px 16px 20px 38px;background:var(--bg)}
-.dgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:980px}
+.dgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 .checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:4px 24px}
 @media (max-width:900px){tr.detail > td{padding-left:16px}}
 .dgrid table{font-size:14px;background:var(--surface);border:1px solid var(--line);border-radius:6px}
@@ -275,13 +275,14 @@ function ratio(top, bottom, target, what){
 }
 function stats(p, idx){
   const T = DATA.targets, L = sum(idx.map(i => p.leads[i])), S = sum(idx.map(i => p.showings[i])), X = sum(idx.map(i => p.leases[i]));
+  const A = sum(idx.map(i => (p.apps || [])[i] || 0));
   const d = days(idx);
   const flags = [];
   if (L < T.leads_per_day * d) flags.push("leads");
   const ls = ratio(L, S, T.leads_per_showing, "showings"), sx = ratio(S, X, T.showings_per_lease, "leases"), lx = ratio(L, X, T.leads_per_lease, "leases");
   if (ls.bad) flags.push("showings");
   if (sx.bad) flags.push("leases");
-  return {L, S, X, d, flags, ls, sx, lx};
+  return {L, S, A, X, d, flags, ls, sx, lx};
 }
 const ratioCell = r => {
   const cls = r.bad ? "bad" : r.v === null || r.v === Infinity ? "none" : "";
@@ -290,7 +291,7 @@ const ratioCell = r => {
 
 /* ---------------- Properties ---------------- */
 const COLS = [
-  ["name", "Property", false], ["vacant", "Vacancies", true], ["rent", "Advertised rent", true], ["L", "Leads", true], ["S", "Showings", true], ["X", "Leases", true],
+  ["name", "Property", false], ["vacant", "Vacancies", true], ["rent", "Advertised rent", true], ["L", "Leads", true], ["S", "Showings", true], ["A", "Apps", true], ["X", "Leases", true],
   ["ls", "Leads per showing", true], ["sx", "Showings per lease", true], ["lx", "Leads per lease", true], ["attn", "Needs attention", false],
 ];
 
@@ -318,7 +319,8 @@ function renderProps(){
   const fl = fx ? [fx] : list;
   $("#focus").hidden = !fx;
   if (fx) $("#focus").innerHTML = `Numbers for <b>${esc(fx.p.name)}</b>.<button type="button" id="showAll">Show all properties</button>`;
-  const L = sum(fl.map(x => x.s.L)), S = sum(fl.map(x => x.s.S)), X = sum(fl.map(x => x.s.X)), V = sum(fl.map(x => x.p.vacant));
+  const L = sum(fl.map(x => x.s.L)), S = sum(fl.map(x => x.s.S)), X = sum(fl.map(x => x.s.X)), A = sum(fl.map(x => x.s.A)), V = sum(fl.map(x => x.p.vacant));
+  const share = (a, b, what) => `<span class="conv">${b ? `${Math.round(100 * a / b)}% ${what}` : "–"}</span>`;
   const conv = (r, t, what) => r.v === null ? `<span class="conv">–</span>` :
     `<span class="conv ${r.bad ? "bad" : "good"}">${r.txt} <span style="font-weight:400;color:var(--muted)">(target ${t} to 1 ${what})</span></span>`;
   const lr = ratio(L, S, T.leads_per_showing, "showings"), sr = ratio(S, X, T.showings_per_lease, "leases"), xr = ratio(L, X, T.leads_per_lease, "leases");
@@ -326,6 +328,7 @@ function renderProps(){
     <div class="stage"><b>${V}</b><span>vacancies now</span><span class="conv">${fx ? `${fx.p.unrented} unrented` : `${list.length} ${list.length === 1 ? "property" : "properties"}${state.group ? ` in ${esc(state.group[0])}` : ""}`}</span></div>
     <div class="stage"><b>${L}</b><span>leads</span>${conv(xr, T.leads_per_lease, "lead to lease")}</div>
     <div class="stage"><b>${S}</b><span>completed showings</span>${conv(lr, T.leads_per_showing, "leads to showing")}</div>
+    <div class="stage"><b>${A}</b><span>applications</span>${share(A, S, "of showings")}${share(X, A, "became leases")}</div>
     <div class="stage"><b>${X}</b><span>leases countersigned</span>${conv(sr, T.showings_per_lease, "showings to lease")}</div>`;
 
   // Sort
@@ -344,7 +347,7 @@ function renderProps(){
     const z = n => n ? n : `<span class="zero">0</span>`;
     return `<tr class="prop${open ? " open" : ""}" data-id="${esc(p.id)}" tabindex="0" aria-expanded="${open}">
       <td><span class="caret" aria-hidden="true">›</span> ${esc(p.name)}</td>
-      <td class="n">${z(p.vacant)}</td>${rentCell(p, idx)}<td class="n">${z(s.L)}</td><td class="n">${z(s.S)}</td><td class="n">${z(s.X)}</td>
+      <td class="n">${z(p.vacant)}</td>${rentCell(p, idx)}<td class="n">${z(s.L)}</td><td class="n">${z(s.S)}</td><td class="n">${z(s.A)}</td><td class="n">${z(s.X)}</td>
       ${ratioCell(s.ls)}${ratioCell(s.sx)}${ratioCell(s.lx)}
       <td class="flags">${s.flags.length ? s.flags.map(f => `<span class="tag">${label[f]}</span>`).join("") : `<span class="tag ok">On target</span>`}</td>
     </tr>` + (open ? `<tr class="detail"><td colspan="${COLS.length}">${detail(p, s, idx)}</td></tr>` : "");
@@ -357,20 +360,22 @@ function detail(p, s, idx){
   const weeks = idx.map(i => {
     const [a, b] = DATA.weeks[i], w = stats(p, [i]), partial = DATA.partial && i === n - 1;
     return `<tr class="${partial ? "partial" : ""}"><td>${fmtDate(a)} – ${fmtDate(b)}${partial ? " (so far)" : ""}</td><td class="n">${money(p.rent[i])}</td>
-      <td class="n">${w.L}</td><td class="n">${w.S}</td><td class="n">${w.X}</td>
-      <td class="n">${pct(w.S, w.L)}</td><td class="n">${pct(w.X, w.S)}</td><td class="n">${pct(w.X, w.L)}</td>
+      <td class="n">${w.L}</td><td class="n">${w.S}</td><td class="n">${w.A}</td><td class="n">${w.X}</td>
+      <td class="n">${pct(w.S, w.L)}</td><td class="n">${pct(w.A, w.S)}</td><td class="n">${pct(w.X, w.A)}</td><td class="n">${pct(w.X, w.L)}</td>
       <td>${partial ? "" : w.flags.map(f => `<span class="tag">${PLAYBOOK[f].title}</span>`).join("")}</td></tr>`;
   }).join("");
   const checks = s.flags.length ? s.flags.map(f => `<div class="check"><h3>${PLAYBOOK[f].title}</h3><ul>${
       PLAYBOOK[f].items.map(([h, xs]) => `<li><b>${esc(h)}:</b> ${xs.map(esc).join("; ")}</li>`).join("")}</ul></div>`).join("")
     : `<div class="check"><h3>On target</h3><p>Nothing to check for this period.</p></div>`;
-  const src = p.sources && p.sources.length ? `<div class="check"><h3>Where leads came from</h3><p>Last ${DATA.full_weeks} weeks: ${p.sources.map(([k, v]) => `${esc(k)} ${v}`).join(", ")}</p></div>` : "";
+  // Leads by source for the chosen dates; every lead has a source, so these add up to the leads
+  const bySrc = Object.entries(p.sources || {}).map(([k, arr]) => [k, sum(idx.map(i => arr[i] || 0))]).filter(([, v]) => v).sort((x, y) => y[1] - x[1]);
+  const src = bySrc.length ? `<div class="check"><h3>Where leads came from</h3><ul>${bySrc.map(([k, v]) => `<li>${esc(k)}: ${v}</li>`).join("")}</ul><p>${s.L} leads in total</p></div>` : "";
   const vac = `${p.vacant} ${p.vacant === 1 ? "vacancy" : "vacancies"}${p.vacant ? `, ${p.unrented} unrented` : ""}`;
   return `<div class="dgrid">
     <div>
       <h3 style="margin-top:12px">Week by week</h3>
       <div class="tablewrap" style="border:0"><table>
-        <thead><tr><th>Week</th><th class="n">Avg advertised rent</th><th class="n">Leads</th><th class="n">Showings</th><th class="n">Leases</th><th class="n">Leads to showings</th><th class="n">Showings to leases</th><th class="n">Lead to lease</th><th></th></tr></thead>
+        <thead><tr><th>Week</th><th class="n">Avg advertised rent</th><th class="n">Leads</th><th class="n">Showings</th><th class="n">Apps</th><th class="n">Leases</th><th class="n">Leads to showings</th><th class="n">Showings to apps</th><th class="n">Apps to leases</th><th class="n">Lead to lease</th><th></th></tr></thead>
         <tbody>${weeks}</tbody>
       </table></div>
       <p class="dlinks">${esc(vac)}. <a href="${esc(DATA.base_url)}properties/${encodeURIComponent(p.id)}" target="_blank" rel="noopener">Open in AppFolio</a></p>
@@ -412,7 +417,7 @@ function renderRules(){
   $("#rules").innerHTML = [
     `Targets: ${T.leads_per_showing} leads to 1 showing, ${T.showings_per_lease} showings to 1 lease, ${T.leads_per_lease} leads to 1 lease. Red ratios are worse than target.`,
     `Low leads means fewer than ${T.leads_per_day} leads a day for the period. Low showings means fewer than 1 showing for every ${T.leads_per_showing} leads. Low leases means fewer than 1 lease for every ${T.showings_per_lease} showings.`,
-    `Leads are guest card inquiries by date received. Showings are completed showings. Leases are counted on the countersigned date${DATA.renewals_counted ? "" : ", not counting renewals"}. Vacancies are units vacant or on notice as of today, like the Unit Vacancy Detail report.`,
+    `Leads are guest card inquiries by date received. Showings are completed showings. Applications are rental applications by date received, counting a household applying together once. Leases are counted on the countersigned date${DATA.renewals_counted ? "" : ", not counting renewals"}. Vacancies are units vacant or on notice as of today, like the Unit Vacancy Detail report.`,
     `Click a property for its week-by-week numbers and what to check.`,
   ].map(x => `<li>${esc(x)}</li>`).join("");
 }
