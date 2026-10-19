@@ -28,6 +28,7 @@ jobs:
       APPFOLIO_CLIENT_SECRET: ${{ secrets.APPFOLIO_CLIENT_SECRET }}
       APPFOLIO_SUBDOMAIN: guidemanagement
       APPFOLIO_FILTERS: ${{ vars.APPFOLIO_FILTERS }}
+      TIMEERO_API_KEY: ${{ secrets.TIMEERO_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
