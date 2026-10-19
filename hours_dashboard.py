@@ -14,6 +14,11 @@ Optional settings (environment variables):
                             built-in guesses don't find it
     APPFOLIO_LABOR_FILTERS  extra report filters as JSON, e.g. a date filter
     HOURS_DAYS              how many days to pull and show (default 90)
+    TIMEERO_API_KEY         Timeero Public API key; adds clocked-in hours to the page
+    TIMEERO_GROUP_ID        only use this Timeero group (e.g. the maintenance team)
+
+If Timeero and AppFolio spell someone's name differently, add the pair to
+tech_names.json, e.g. {"Mike Smith": "Michael Smith"} (Timeero name: AppFolio name).
 
 Usage:
     python hours_dashboard.py --out _site   # build _site/hours/index.html
@@ -33,7 +38,6 @@ from urllib.parse import urljoin, urlsplit
 from zoneinfo import ZoneInfo
 
 import requests
-
 
 # AppFolio answers 429 ("Retry later") when it gets too many requests in a short time.
 # Wait and try again instead of failing the whole page.
@@ -55,7 +59,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-08 hours v7 (retries on 429)"
+VERSION = "2026-10-19 hours v8 (retries on 429, Timeero)"
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "hours_template.html"
 CONFIG_PATH = HERE / "config.ini"
@@ -266,6 +270,143 @@ def fetch_by_week(cfg, report, extra):
     return rows
 
 
+# ---------------------------------------------------------------- Timeero
+TIMEERO_BASE = "https://api.timeero.app/api/public/"
+NAMES_PATH = HERE / "tech_names.json"
+
+
+def timeero_get(key, path, params):
+    """GET one Timeero page, staying under their 60-requests-a-minute limit."""
+    for attempt in range(4):
+        time.sleep(1.1)
+        r = requests.get(TIMEERO_BASE + path, params=params, timeout=120,
+                         headers={"Authorization": key, "Accept": "application/json"})
+        if r.status_code == 429:
+            log.info("Timeero asked us to slow down; waiting a minute")
+            time.sleep(61)
+            continue
+        if r.status_code == 401:
+            raise RuntimeError("Timeero rejected the API key (401). Check the TIMEERO_API_KEY secret.")
+        if r.status_code >= 400:
+            raise RuntimeError(f"Timeero returned {r.status_code}: {r.text[:300]}")
+        return r.json()
+    raise RuntimeError("Timeero kept rate-limiting the requests.")
+
+
+def fetch_timeero(key, first, last):
+    """All timesheets from first to last, a week at a time."""
+    group = os.environ.get("TIMEERO_GROUP_ID", "").strip()
+    out, d = [], first
+    while d <= last:
+        end = min(d + timedelta(days=6), last)
+        page, got = 1, 0
+        while True:
+            params = {"date_range": f"{d.isoformat()},{end.isoformat()}", "page_size": 100, "page": page}
+            if group:
+                params["group_id"] = group
+            data = timeero_get(key, "timesheets", params)
+            items = data.get("items", [])
+            out.extend(items)
+            got += len(items)
+            pg = (data.get("meta_data") or {}).get("pagination") or {}
+            if not items or not pg.get("next_page_url") or page >= int(pg.get("last_page") or page):
+                break
+            page += 1
+        log.info("Timeero %s to %s: %s timesheets", d, end, got)
+        d = end + timedelta(days=1)
+    return out
+
+
+def norm_name(n):
+    n = re.sub(r"\(hidden\)", "", str(n or ""), flags=re.I)
+    n = re.sub(r"[^a-z ]", "", n.lower())
+    return re.sub(r"\s+", " ", n).strip()
+
+
+def load_name_map():
+    if not NAMES_PATH.exists():
+        return {}
+    try:
+        return {norm_name(k): v for k, v in json.loads(NAMES_PATH.read_text(encoding="utf-8")).items()}
+    except (json.JSONDecodeError, AttributeError):
+        log.info("tech_names.json isn't valid JSON; ignoring it")
+        return {}
+
+
+def match_names(timeero_names, appfolio_names):
+    """Map each Timeero name to an AppFolio tech name, or None."""
+    by_norm = {norm_name(a): a for a in appfolio_names}
+    by_last = {}
+    for a in appfolio_names:
+        parts = norm_name(a).split()
+        if len(parts) >= 2:
+            by_last.setdefault((parts[0][0], parts[-1]), []).append(a)
+    manual = load_name_map()
+    out = {}
+    for t in timeero_names:
+        n = norm_name(t)
+        if n in manual:
+            out[t] = manual[n]
+            continue
+        if n in by_norm:
+            out[t] = by_norm[n]
+            continue
+        parts = n.split()
+        cand = by_last.get((parts[0][0], parts[-1])) if len(parts) >= 2 else None
+        out[t] = cand[0] if cand and len(cand) == 1 else None   # same first initial + last name
+    return out
+
+
+def to_hours(hms):
+    m = re.fullmatch(r"(\d+):(\d{2})(?::(\d{2}))?", str(hms or "").strip())
+    return int(m[1]) + int(m[2]) / 60 + int(m[3] or 0) / 3600 if m else None
+
+
+def build_clock(items, entries, first, last):
+    """Turn Timeero timesheets into per-shift rows keyed by the AppFolio tech name."""
+    af_names = sorted({e["t"] for e in entries if e["t"] != "Unassigned"})
+    def tname(x):
+        return re.sub(r"\s+", " ", f"{x.get('first_name') or ''} {x.get('last_name') or ''}").strip()
+    names = match_names({tname(x) for x in items if tname(x)}, af_names)
+    group = bool(os.environ.get("TIMEERO_GROUP_ID", "").strip())
+    shifts, unmatched_t = [], set()
+    for x in items:
+        tn = tname(x)
+        who = names.get(tn)
+        if not who:
+            if group and tn:          # a maintenance-group person with no AppFolio labor: still show them
+                who = tn
+                unmatched_t.add(tn)
+            else:
+                continue              # office staff etc. who never log work order labor
+        cin, cout = parse_dt(x.get("clock_in_time")), parse_dt(x.get("clock_out_time"))
+        if not cin:
+            continue
+        d = cin.date()
+        if not (first <= d <= last):
+            continue
+        brk = (x.get("break_in_seconds") or 0) / 3600
+        is_open = cout is None
+        if cout:
+            hrs = (cout - cin).total_seconds() / 3600 - brk
+        else:
+            tz = x.get("clock_in_timezone") or "America/Los_Angeles"
+            try:
+                now = datetime.now(ZoneInfo(tz)).replace(tzinfo=None)
+            except Exception:
+                now = datetime.now(TZ).replace(tzinfo=None)
+            hrs = (now - cin).total_seconds() / 3600 - brk if d == last else (to_hours(x.get("duration")) or 0)
+        hrs = max(0.0, hrs)
+        shifts.append({"d": d.isoformat(), "t": who, "c": round(hrs, 2), "s": clock(cin), "e": clock(cout),
+                       "b": round(brk * 60), "open": 1 if is_open else 0,
+                       "job": clean(x.get("job_name"), 50), "task": clean(x.get("task_name"), 50)})
+    matched = {names[t] for t in names if names[t]}
+    no_clock = [a for a in af_names if a not in matched]
+    log.info("Timeero: %s shifts kept; %s of %s AppFolio techs matched by name", len(shifts), len(matched & set(af_names)), len(af_names))
+    shifts.sort(key=lambda x: (x["t"], x["d"], x["s"]))
+    return shifts, {"noClock": no_clock, "noLabor": sorted(unmatched_t)}
+
+
 # ---------------------------------------------------------------- parsing
 def pick(rec, names):
     for n in names:
@@ -386,12 +527,13 @@ def build_entries(rows, base):
     return out, first, today
 
 
-def write_site(entries, first, last, base, out_dir):
+def write_site(entries, first, last, base, out_dir, clock=None, clock_note=None):
     now = datetime.now(TZ)
     data = {
         "generated": now.strftime("%b %-d, %Y at %-I:%M %p").replace("AM", "a.m.").replace("PM", "p.m."),
         "first": first.isoformat(), "last": last.isoformat(),
         "appfolio": base, "entries": entries,
+        "clock": clock, "clockNote": clock_note,
     }
     blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
     html = TEMPLATE.read_text(encoding="utf-8")
@@ -425,6 +567,24 @@ def inspect(cfg):
         log.info("No work order / service request IDs, so work order numbers won't be clickable.")
 
 
+def inspect_timeero():
+    key = os.environ.get("TIMEERO_API_KEY", "").strip()
+    if not key:
+        log.info("Timeero: no TIMEERO_API_KEY secret, so clocked hours are off.")
+        return
+    today = datetime.now(TZ).date()
+    try:
+        data = timeero_get(key, "timesheets", {"date_range": f"{(today - timedelta(days=6)).isoformat()},{today.isoformat()}", "page_size": 100})
+    except RuntimeError as e:
+        log.info("Timeero: %s", e)
+        return
+    items = data.get("items", [])
+    total = ((data.get("meta_data") or {}).get("pagination") or {}).get("total")
+    log.info("Timeero: key works. %s timesheets in the last 7 days.", total if total is not None else len(items))
+    if items:
+        log.info("Timeero fields: %s", ", ".join(sorted(set().union(*[set(x) for x in items]))))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="_site")
@@ -434,6 +594,7 @@ def main():
     cfg = load_cfg()
     if a.inspect:
         inspect(cfg)
+        inspect_timeero()
         return
     base = f"https://{cfg['subdomain']}.appfolio.com/"
     report, first_resp, used = find_report(cfg, extra_filters())
@@ -442,7 +603,16 @@ def main():
     else:
         rows = fetch_all(cfg, first_resp)
     entries, first, last = build_entries(rows, base)
-    write_site(entries, first, last, base, a.out)
+    clock, note = None, None
+    key = os.environ.get("TIMEERO_API_KEY", "").strip()
+    if key:
+        try:
+            clock, note = build_clock(fetch_timeero(key, first, last), entries, first, last)
+        except (RuntimeError, requests.RequestException, ValueError) as e:
+            log.info("Timeero problem, building the page without clocked hours: %s", e)
+    else:
+        log.info("No TIMEERO_API_KEY secret; building without clocked hours")
+    write_site(entries, first, last, base, a.out, clock, note)
 
 
 if __name__ == "__main__":

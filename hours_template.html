@@ -150,6 +150,34 @@ footer{margin-top:28px;color:var(--muted);font-size:13px;max-width:80ch}
 .controls input[type=date]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
 .dates.custom input[type=date]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .empty-state{padding:40px 20px;text-align:center;color:var(--muted)}
+:root{--p1:#F2C14E;--p2:#9FC0DA;--p3:#1F5F8B}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--p1:#B8862A;--p2:#2C5677;--p3:#76AEDB}}
+:root[data-theme="dark"]{--p1:#B8862A;--p2:#2C5677;--p3:#76AEDB}
+.p1 .c{background:var(--p1);color:#1C2733}
+.p2 .c{background:var(--p2);color:var(--ink)}
+.p3 .c{background:var(--p3);color:#fff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .p3 .c{color:#10202E}}
+:root[data-theme="dark"] .p3 .c{color:#10202E}
+.p4 .c{background:var(--alert);color:#fff}
+.cell .c.ghost{background-image:none;outline:1px dashed var(--h3);outline-offset:-3px;box-shadow:none}
+.controls #view[hidden]{display:none}
+.dbar{position:relative}
+.dbar .clk{position:absolute;bottom:16px;left:0;right:0;border:1.5px solid var(--h4);border-bottom:0;border-radius:2px 2px 0 0;pointer-events:none}
+.dbar span{position:relative;z-index:1}
+.dnote{margin:8px 0 0;color:var(--muted);font-size:13px}
+.dsub{font-family:var(--cond);font-size:19px;margin:16px 0 4px}
+.tl{margin:4px 0 6px}
+.tl-row{display:flex;align-items:center;gap:10px;margin:4px 0}
+.tl-lbl{flex:0 0 86px;font-size:13px;color:var(--muted);text-align:right}
+.tl-track{position:relative;flex:1;height:18px;background:var(--wkend);border-radius:3px}
+.tl-track i{position:absolute;top:2px;bottom:2px;border-radius:2px}
+.tl-shift{background:var(--h2)}
+.tl-wo{background:var(--h4);opacity:.85}
+.tl-wo.ov{background:var(--flag);opacity:1}
+.tl-axis{position:relative;flex:1;height:16px;font-family:var(--cond);font-size:12px;color:var(--muted)}
+.tl-axis span{position:absolute;transform:translateX(-50%)}
+.entries tfoot td{text-align:left}
+.entries tfoot td.n{text-align:right}
 </style>
 </head>
 <body>
@@ -163,6 +191,11 @@ footer{margin-top:28px;color:var(--muted);font-size:13px;max-width:80ch}
   <div class="figures" id="figures"></div>
 
   <div class="controls">
+    <div class="seg" role="group" aria-label="What the grid shows" id="view">
+      <button data-v="wo">Work order hours</button>
+      <button data-v="clock">Clocked hours</button>
+      <button data-v="pct">% logged</button>
+    </div>
     <div class="seg" role="group" aria-label="Date range" id="range">
       <button data-r="7">Last 7 days</button>
       <button data-r="14">Last 14 days</button>
@@ -176,7 +209,7 @@ footer{margin-top:28px;color:var(--muted);font-size:13px;max-width:80ch}
     <label><input type="checkbox" id="wk"> Hide weekends</label>
     <label>Sort by
       <select id="sort">
-        <option value="total">Most hours</option>
+        <option value="total">Highest first</option>
         <option value="avg">Avg per day worked</option>
         <option value="name">Name</option>
       </select>
@@ -192,7 +225,7 @@ footer{margin-top:28px;color:var(--muted);font-size:13px;max-width:80ch}
 
   <section class="flags">
     <h2>Worth a look</h2>
-    <p>Days above the flag line usually mean a labor timer left running or time entered twice. Click a day to see its work orders. Entries whose times overlap are highlighted.</p>
+    <p>Long days usually mean a labor timer left running or time entered twice. Work order time beyond a tech's clocked shift, or a shift with little logged, is worth a conversation. Click any day to see what's behind it.</p>
     <ul class="flaglist" id="flags"></ul>
   </section>
 
@@ -209,9 +242,15 @@ const isWk = s => { const w = dow(s); return w === 0 || w === 6; };
 const fmtLong = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 const fmtShort = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 const r1 = n => (Math.round(n * 10) / 10).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const pctTxt = n => Math.round(n) + '%';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const plain = t => t.replace(' (Hidden)', '');
 const entriesWord = n => `${n} ${n === 1 ? 'entry' : 'entries'}`;
+function toMin(s) {
+  const m = /^(\d+):(\d+) (AM|PM)$/.exec(s || ''); if (!m) return null;
+  return (+m[1] % 12 + (m[3] === 'PM' ? 12 : 0)) * 60 + +m[2];
+}
+const minLabel = m => { const h = Math.floor(m / 60) % 24; return `${h % 12 || 12}${h < 12 ? 'a' : 'p'}`; };
 
 if (!DATA || !DATA.entries) {
   document.querySelector('.wrap').insertAdjacentHTML('beforeend', '<p class="empty-state">No data yet. Run the workflow in GitHub to build this page.</p>');
@@ -221,22 +260,25 @@ if (!DATA || !DATA.entries) {
 /* ---------- data ---------- */
 const allDates = [];
 for (let d = DATA.first; d <= DATA.last; d = addDays(d, 1)) allDates.push(d);
-const byTech = {};   // tech -> date -> {h, e, ov, list}
+const byTech = {};   // work order labor: tech -> date -> {h, e, ov, list}
 DATA.entries.forEach(x => {
   const c = ((byTech[x.t] ||= {})[x.d] ||= { h: 0, e: 0, ov: 0, list: [] });
   c.h += x.h; c.e++; c.ov += x.ov ? 1 : 0; c.list.push(x);
 });
-Object.values(byTech).forEach(days => Object.values(days).forEach(c => {
-  c.list.sort((a, b) => toMin(a.s) - toMin(b.s));
-}));
-function toMin(s) {
-  const m = /^(\d+):(\d+) (AM|PM)$/.exec(s || ''); if (!m) return 9999;
-  return (+m[1] % 12 + (m[3] === 'PM' ? 12 : 0)) * 60 + +m[2];
-}
+const HAS_CLOCK = Array.isArray(DATA.clock);
+const clockBy = {};  // Timeero: tech -> date -> {c, open, list}
+(DATA.clock || []).forEach(x => {
+  const c = ((clockBy[x.t] ||= {})[x.d] ||= { c: 0, open: 0, list: [] });
+  c.c += x.c; c.open += x.open ? 1 : 0; c.list.push(x);
+});
+[byTech, clockBy].forEach(m => Object.values(m).forEach(days => Object.values(days).forEach(c => c.list.sort((a, b) => (toMin(a.s) ?? 9999) - (toMin(b.s) ?? 9999)))));
+const allTechs = [...new Set([...Object.keys(byTech), ...Object.keys(clockBy)])];
 const todayStr = DATA.last;
+const wo = (t, d) => (byTech[t] && byTech[t][d]) || null;
+const ck = (t, d) => (clockBy[t] && clockBy[t][d]) || null;
 
 /* ---------- state ---------- */
-const state = { range: Math.min(14, allDates.length), from: null, to: null, sort: 'total', hideWk: false, thr: 12, sel: null, pick: null };
+const state = { range: Math.min(14, allDates.length), from: null, to: null, view: 'wo', sort: 'total', hideWk: false, thr: 12, sel: null, pick: null };
 
 function rangeDates() {
   if (state.from || state.to) {
@@ -247,13 +289,13 @@ function rangeDates() {
 }
 const visibleDates = () => rangeDates().filter(d => !(state.hideWk && isWk(d)));
 function statsFor(tech, dates) {
-  let tot = 0, days = 0, ent = 0, max = 0, maxD = null;
+  let tot = 0, days = 0, ent = 0, max = 0, maxD = null, clk = 0, clkDays = 0, woOnClk = 0;
   dates.forEach(d => {
-    const c = byTech[tech][d]; if (!c) return;
-    tot += c.h; ent += c.e; if (c.h > 0) days++;
-    if (c.h > max) { max = c.h; maxD = d; }
+    const c = wo(tech, d), k = ck(tech, d);
+    if (c) { tot += c.h; ent += c.e; if (c.h > 0) days++; if (c.h > max) { max = c.h; maxD = d; } }
+    if (k && k.c > 0) { clk += k.c; clkDays++; woOnClk += c ? c.h : 0; }
   });
-  return { tot, days, ent, avg: days ? tot / days : 0, max, maxD };
+  return { tot, days, ent, avg: days ? tot / days : 0, max, maxD, clk, clkDays, pct: clk ? (woOnClk / clk) * 100 : null };
 }
 function bin(h) {
   if (h <= 0) return '';
@@ -263,149 +305,240 @@ function bin(h) {
   if (h <= 10) return 'b4';
   return 'b5';
 }
+function pbin(p) {
+  if (p < 50) return 'p1';
+  if (p < 85) return 'p2';
+  if (p <= 105) return 'p3';
+  return 'p4';
+}
 
 /* ---------- render ---------- */
 function render() {
   const dates = visibleDates();
-  const techs = Object.keys(byTech).map(t => ({ t, s: statsFor(t, dates) })).filter(x => x.s.ent > 0);
+  const techs = allTechs.map(t => ({ t, s: statsFor(t, dates) })).filter(x => x.s.ent > 0 || x.s.clk > 0);
+  const key = state.view === 'clock' ? 'clk' : (state.view === 'pct' ? 'pct' : 'tot');
   techs.sort((a, b) => {
     if (a.t === 'Unassigned') return 1;
     if (b.t === 'Unassigned') return -1;
     if (state.sort === 'name') return a.t.localeCompare(b.t);
     if (state.sort === 'avg') return b.s.avg - a.s.avg;
-    return b.s.tot - a.s.tot;
+    return (b.s[key] ?? -1) - (a.s[key] ?? -1);
   });
 
-  const dayTot = {}; dates.forEach(d => dayTot[d] = 0);
-  techs.forEach(x => dates.forEach(d => { const c = byTech[x.t][d]; if (c) dayTot[d] += c.h; }));
-  const maxDay = Math.max(1, ...Object.values(dayTot));
+  const dayWo = {}, dayClk = {}, dayWoOnClk = {};
+  dates.forEach(d => { dayWo[d] = 0; dayClk[d] = 0; dayWoOnClk[d] = 0; });
+  techs.forEach(x => dates.forEach(d => {
+    const c = wo(x.t, d), k = ck(x.t, d);
+    if (c) dayWo[d] += c.h;
+    if (k && k.c > 0) { dayClk[d] += k.c; dayWoOnClk[d] += c ? c.h : 0; }
+  }));
+  const barSrc = state.view === 'clock' ? dayClk : dayWo;
+  const maxDay = Math.max(1, ...Object.values(barSrc));
 
+  // figures
   const real = techs.filter(x => x.t !== 'Unassigned');
-  const total = Object.values(dayTot).reduce((a, b) => a + b, 0);
+  const total = Object.values(dayWo).reduce((a, b) => a + b, 0);
+  const totalClk = Object.values(dayClk).reduce((a, b) => a + b, 0);
+  const totalWoOnClk = Object.values(dayWoOnClk).reduce((a, b) => a + b, 0);
   const techDays = real.reduce((a, x) => a + x.s.days, 0);
-  const weekdays = dates.filter(d => !isWk(d) && d !== todayStr);
-  const avgWeekday = weekdays.length ? weekdays.reduce((a, d) => a + dayTot[d], 0) / weekdays.length : 0;
   const todayTot = DATA.entries.filter(x => x.d === todayStr).reduce((a, x) => a + x.h, 0);
-  $('figures').innerHTML = dates.length ? `
-    <div class="fig"><b>${r1(total)}</b><span>hours logged, ${fmtShort(dates[0])} to ${fmtShort(dates[dates.length - 1])}</span></div>
-    <div class="fig"><b>${real.length}</b><span>techs logged time</span></div>
-    <div class="fig"><b>${r1(techDays ? real.reduce((a, x) => a + x.s.tot, 0) / techDays : 0)}</b><span>avg hours per tech on days worked</span></div>
-    <div class="fig"><b>${r1(avgWeekday)}</b><span>avg team hours per full weekday</span></div>
-    <div class="fig"><b>${r1(todayTot)}</b><span>logged today so far</span></div>` : '';
+  const span = dates.length ? `${fmtShort(dates[0])} to ${fmtShort(dates[dates.length - 1])}` : '';
+  $('figures').innerHTML = !dates.length ? '' : `
+    <div class="fig"><b>${r1(total)}</b><span>work order hours, ${span}</span></div>
+    ${HAS_CLOCK ? `<div class="fig"><b>${r1(totalClk)}</b><span>hours clocked in Timeero</span></div>
+    <div class="fig"><b>${totalClk ? pctTxt(totalWoOnClk / totalClk * 100) : '—'}</b><span>of clocked time logged to work orders</span></div>` : ''}
+    <div class="fig"><b>${real.length}</b><span>techs</span></div>
+    <div class="fig"><b>${r1(techDays ? real.reduce((a, x) => a + x.s.tot, 0) / techDays : 0)}</b><span>avg work order hours per tech-day</span></div>
+    <div class="fig"><b>${r1(todayTot)}</b><span>work order hours today so far</span></div>`;
 
+  // grid
   let h = '<thead><tr><th class="tcol" scope="col">Technician</th>';
   dates.forEach(d => {
-    const pct = Math.round((dayTot[d] / maxDay) * 100);
-    h += `<th scope="col" class="dayh${isWk(d) ? ' wk' : ''}${d === todayStr ? ' today' : ''}" title="${fmtLong(d)}: ${r1(dayTot[d])} team hours">
-      <div class="barwrap"><div class="bar" style="height:${Math.max(pct, dayTot[d] ? 3 : 0)}%"></div></div>
+    const pct = Math.round((barSrc[d] / maxDay) * 100);
+    const tip = HAS_CLOCK ? `${fmtLong(d)}: ${r1(dayWo[d])} work order hrs, ${r1(dayClk[d])} clocked` : `${fmtLong(d)}: ${r1(dayWo[d])} team hours`;
+    h += `<th scope="col" class="dayh${isWk(d) ? ' wk' : ''}${d === todayStr ? ' today' : ''}" title="${tip}">
+      <div class="barwrap"><div class="bar" style="height:${Math.max(pct, barSrc[d] ? 3 : 0)}%"></div></div>
       <span class="dw">${'SMTWTFS'[dow(d)]}</span><span class="dn">${+d.slice(8)}</span></th>`;
   });
-  h += '<th scope="col" class="sumh">Total</th><th scope="col" class="sumh">Days</th><th scope="col" class="sumh">Avg/day</th></tr></thead><tbody>';
+  h += HAS_CLOCK
+    ? '<th scope="col" class="sumh">WO hrs</th><th scope="col" class="sumh">Clocked</th><th scope="col" class="sumh">Logged</th></tr></thead><tbody>'
+    : '<th scope="col" class="sumh">Total</th><th scope="col" class="sumh">Days</th><th scope="col" class="sumh">Avg/day</th></tr></thead><tbody>';
 
   techs.forEach(x => {
     const hidden = x.t.includes('(Hidden)'), name = plain(x.t);
     h += `<tr class="${state.sel === x.t ? 'selected' : ''}"><th scope="row" class="tcol">
       <button class="tname" data-t="${esc(x.t)}" title="Show ${esc(name)}'s days">${esc(name)}${hidden ? ' <span class="tag">(hidden in AppFolio)</span>' : ''}</button></th>`;
-    dates.forEach(d => {
-      const c = byTech[x.t][d], wk = isWk(d) ? ' wk' : '';
-      if (!c) { h += `<td class="cell${wk}"></td>`; return; }
-      const flag = c.h > WAY_OVER ? ' way' : (c.h > state.thr ? ' over' : '');
-      const picked = state.pick && state.pick.t === x.t && state.pick.d === d ? ' picked' : '';
-      const txt = c.h === 0 ? '0' : (c.h < 10 ? r1(c.h).replace(/\.0$/, '') : Math.round(c.h));
-      const tip = `${name}, ${fmtLong(d)}: ${r1(c.h)} hrs across ${entriesWord(c.e)}${c.ov ? `, ${c.ov} overlapping` : ''}. Click to see work orders.`;
-      h += `<td class="cell ${bin(c.h)}${flag}${wk}${picked}${c.ov ? ' hasov' : ''}"><button class="c" data-t="${esc(x.t)}" data-d="${d}" title="${esc(tip)}" aria-label="${esc(tip)}">${c.h > 0 ? txt : ''}</button></td>`;
-    });
-    h += `<td class="sum first">${r1(x.s.tot)}</td><td class="sum m">${x.s.days}</td><td class="sum m">${r1(x.s.avg)}</td></tr>`;
+    dates.forEach(d => h += cellHtml(x.t, name, d));
+    h += HAS_CLOCK
+      ? `<td class="sum first">${r1(x.s.tot)}</td><td class="sum m">${x.s.clk ? r1(x.s.clk) : '—'}</td><td class="sum m">${x.s.pct == null ? '—' : pctTxt(x.s.pct)}</td></tr>`
+      : `<td class="sum first">${r1(x.s.tot)}</td><td class="sum m">${x.s.days}</td><td class="sum m">${r1(x.s.avg)}</td></tr>`;
   });
   h += '</tbody><tfoot><tr><td class="tcol">All techs</td>';
-  dates.forEach(d => h += `<td class="${isWk(d) ? 'cell wk' : ''}">${Math.round(dayTot[d])}</td>`);
-  h += `<td class="sum first">${r1(total)}</td><td></td><td></td></tr></tfoot>`;
+  dates.forEach(d => {
+    const v = state.view === 'clock' ? Math.round(dayClk[d]) : state.view === 'pct' ? (dayClk[d] ? pctTxt(dayWoOnClk[d] / dayClk[d] * 100) : '') : Math.round(dayWo[d]);
+    h += `<td class="${isWk(d) ? 'cell wk' : ''}">${v}</td>`;
+  });
+  h += HAS_CLOCK
+    ? `<td class="sum first">${r1(total)}</td><td class="sum m">${r1(totalClk)}</td><td class="sum m">${totalClk ? pctTxt(totalWoOnClk / totalClk * 100) : '—'}</td></tr></tfoot>`
+    : `<td class="sum first">${r1(total)}</td><td></td><td></td></tr></tfoot>`;
   $('grid').innerHTML = h;
 
-  $('legend').innerHTML = `
-    <span><span class="sw" style="background:var(--h1)"></span>under 2 hrs</span>
-    <span><span class="sw" style="background:var(--h2)"></span>2 to 5</span>
-    <span><span class="sw" style="background:var(--h3)"></span>5 to 8</span>
-    <span><span class="sw" style="background:var(--h4)"></span>8 to 10</span>
-    <span><span class="sw" style="background:var(--h5)"></span>over 10</span>
-    <span><span class="sw" style="background:var(--h4);box-shadow:inset 0 0 0 2px var(--flag)"></span>over ${state.thr} (flag)</span>
-    <span><span class="sw" style="background:var(--alert)"></span>over ${WAY_OVER}</span>
-    <span>Wavy underline means some entries that day overlap. Bars on top show team total per day; shaded columns are weekends.</span>`;
-
+  renderLegend();
   renderFlags(dates);
   renderDetail(dates);
   renderDay();
   const custom = !!(state.from || state.to), rd = rangeDates();
   document.querySelectorAll('#range button').forEach(b => b.setAttribute('aria-pressed', !custom && +b.dataset.r === state.range));
+  document.querySelectorAll('#view button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === state.view));
   document.querySelector('.dates').classList.toggle('custom', custom);
   if (rd.length && document.activeElement !== $('from') && document.activeElement !== $('to')) { $('from').value = rd[0]; $('to').value = rd[rd.length - 1]; }
 }
 
+function cellHtml(t, name, d) {
+  const c = wo(t, d), k = ck(t, d), wk = isWk(d) ? ' wk' : '';
+  const picked = state.pick && state.pick.t === t && state.pick.d === d ? ' picked' : '';
+  const woH = c ? c.h : 0, clH = k ? k.c : 0;
+  if (!c && !k) return `<td class="cell${wk}"></td>`;
+  let cls = '', txt = '', extra = '';
+  if (state.view === 'wo') {
+    if (!c) return `<td class="cell${wk}"><button class="c ghost" data-t="${esc(t)}" data-d="${d}" title="${esc(name)}, ${fmtLong(d)}: clocked ${r1(clH)} hrs, no work order time" aria-label="${esc(name)}, ${fmtLong(d)}: no work order time"></button></td>`;
+    cls = bin(woH) + (woH > WAY_OVER ? ' way' : (woH > state.thr ? ' over' : ''));
+    txt = woH === 0 ? '' : (woH < 10 ? r1(woH).replace(/\.0$/, '') : Math.round(woH));
+    if (c.ov) extra = ' hasov';
+  } else if (state.view === 'clock') {
+    if (!clH) return `<td class="cell${wk}"><button class="c ghost" data-t="${esc(t)}" data-d="${d}" title="${esc(name)}, ${fmtLong(d)}: ${r1(woH)} work order hrs, not clocked in" aria-label="${esc(name)}, ${fmtLong(d)}: not clocked in"></button></td>`;
+    cls = bin(clH) + (clH > state.thr ? ' over' : '');
+    txt = clH < 10 ? r1(clH).replace(/\.0$/, '') : Math.round(clH);
+    if (k.open && d !== todayStr) extra = ' hasov';
+  } else {
+    if (!clH) { cls = 'p4'; txt = '!'; }
+    else { const p = woH / clH * 100; cls = pbin(p); txt = Math.round(p); }
+  }
+  const tip = `${name}, ${fmtLong(d)}: ${r1(woH)} work order hrs${c ? ` (${entriesWord(c.e)})` : ''}${HAS_CLOCK ? `, ${clH ? r1(clH) + ' clocked' : 'not clocked in'}` : ''}${c && c.ov ? `, ${c.ov} overlapping` : ''}. Click for details.`;
+  return `<td class="cell ${cls}${wk}${picked}${extra}"><button class="c" data-t="${esc(t)}" data-d="${d}" title="${esc(tip)}" aria-label="${esc(tip)}">${txt}</button></td>`;
+}
+
+function renderLegend() {
+  const sw = (bg, label, sh = '') => `<span><span class="sw" style="background:${bg}${sh}"></span>${label}</span>`;
+  let html;
+  if (state.view === 'pct') {
+    html = sw('var(--p1)', 'under 50% logged') + sw('var(--p2)', '50 to 85%') + sw('var(--p3)', '85 to 105%') + sw('var(--alert)', 'over 105%, or work order time with no shift (!)')
+      + '<span>Share of each day\'s clocked time that was logged to work orders.</span>';
+  } else {
+    html = sw('var(--h1)', 'under 2 hrs') + sw('var(--h2)', '2 to 5') + sw('var(--h3)', '5 to 8') + sw('var(--h4)', '8 to 10') + sw('var(--h5)', 'over 10')
+      + sw('var(--h4)', `over ${state.thr} (flag)`, ';box-shadow:inset 0 0 0 2px var(--flag)');
+    html += state.view === 'wo'
+      ? sw('var(--alert)', `over ${WAY_OVER}`) + '<span>Wavy underline: some entries overlap.' + (HAS_CLOCK ? ' Dashed box: clocked in, no work order time.' : '') + '</span>'
+      : '<span>Hours clocked in Timeero, after breaks. Wavy underline: never clocked out. Dashed box: work order time but no shift.</span>';
+  }
+  $('legend').innerHTML = html + '<span>Bars on top show the team total per day; shaded columns are weekends.</span>';
+}
+
+const NO_MATCH = new Set((DATA.clockNote && DATA.clockNote.noClock) || []);
 function renderFlags(dates) {
   const set = new Set(dates), items = [];
-  const cells = [];
-  Object.entries(byTech).forEach(([t, days]) => Object.entries(days).forEach(([d, c]) => { if (set.has(d)) cells.push({ t, d, c }); }));
-  cells.filter(x => x.t !== 'Unassigned' && (x.c.h > state.thr || x.c.ov))
-    .sort((a, b) => b.c.h - a.c.h)
-    .forEach(({ t, d, c }) => items.push(`<li><span class="hrs ${c.h > WAY_OVER ? 'way' : ''}">${r1(c.h)}</span>
-      <span><a href="#" data-t="${esc(t)}" data-d="${d}"><strong>${esc(plain(t))}</strong>, ${fmtLong(d)}</a>
-      <span class="note">${entriesWord(c.e)}${c.ov ? `, ${c.ov} with overlapping times` : ''}</span></span></li>`));
-  cells.filter(x => x.c.list.some(e => e.h === 0))
-    .forEach(({ t, d }) => items.push(`<li><span class="hrs">0.0</span><span><a href="#" data-t="${esc(t)}" data-d="${d}"><strong>${esc(plain(t))}</strong>, ${fmtLong(d)}</a> <span class="note">has a labor entry with no hours on it</span></span></li>`));
-  const un = cells.filter(x => x.t === 'Unassigned');
+  const push = (rank, v, n, cls, t, d, note) => items.push({ rank, v, html: `<li><span class="hrs ${cls}">${n}</span>
+    <span>${d ? `<a href="#" data-t="${esc(t)}" data-d="${d}"><strong>${esc(plain(t))}</strong>, ${fmtLong(d)}</a>` : `<strong>${esc(t)}</strong>`} <span class="note">${note}</span></span></li>` });
+  allTechs.forEach(t => dates.forEach(d => {
+    if (t === 'Unassigned') return;
+    const c = wo(t, d), k = ck(t, d), woH = c ? c.h : 0, clH = k ? k.c : 0;
+    if (c && (woH > state.thr || c.ov)) push(0, woH, r1(woH), woH > WAY_OVER ? 'way' : '', t, d, `work order hours across ${entriesWord(c.e)}${c.ov ? `, ${c.ov} with overlapping times` : ''}`);
+    if (c && c.list.some(e => e.h === 0)) push(4, 0, '0.0', '', t, d, 'has a labor entry with no hours on it');
+    if (!HAS_CLOCK) return;
+    if (clH && woH > clH + 0.5) push(1, woH - clH, r1(woH - clH), 'way', t, d, `more work order hours than clocked hours (${r1(woH)} vs ${r1(clH)})`);
+    else if (clH >= 4 && woH / clH < 0.5 && d !== todayStr) push(3, -woH / clH, pctTxt(woH / clH * 100), '', t, d, `of ${r1(clH)} clocked hours logged to work orders`);
+    if (!clH && woH >= 1 && !NO_MATCH.has(t)) push(1, woH, r1(woH), 'way', t, d, 'work order hours with no Timeero shift that day');
+    if (k && k.open && d !== todayStr) push(2, 0, 'open', '', t, d, 'never clocked out of Timeero');
+  }));
+  items.sort((a, b) => a.rank - b.rank || b.v - a.v);
+  const out = items.map(x => x.html);
+  const un = allTechs.filter(t => t === 'Unassigned' && dates.some(d => wo(t, d)));
   if (un.length) {
-    const tot = un.reduce((a, x) => a + x.c.h, 0);
-    items.push(`<li><span class="hrs">${r1(tot)}</span><span><strong>Unassigned</strong> <span class="note">labor with no technician on it (${un.map(x => `<a href="#" data-t="Unassigned" data-d="${x.d}">${fmtShort(x.d)}</a>`).join(', ')}). These hours don't count toward anyone.</span></span></li>`);
+    const days = dates.filter(d => wo('Unassigned', d));
+    out.push(`<li><span class="hrs">${r1(days.reduce((a, d) => a + wo('Unassigned', d).h, 0))}</span><span><strong>Unassigned</strong> <span class="note">labor with no technician on it (${days.map(d => `<a href="#" data-t="Unassigned" data-d="${d}">${fmtShort(d)}</a>`).join(', ')}). These hours don't count toward anyone.</span></span></li>`);
   }
-  Object.keys(byTech).filter(t => t.includes('(Hidden)') && dates.some(d => byTech[t][d]))
-    .forEach(t => items.push(`<li><span class="hrs">${r1(statsFor(t, dates).tot)}</span><span><strong>${esc(plain(t))}</strong> <span class="note">is marked hidden in AppFolio but has labor in this range</span></span></li>`));
-  $('flags').innerHTML = items.length ? items.join('') : '<li class="empty">Nothing stands out in this range.</li>';
+  allTechs.filter(t => t.includes('(Hidden)') && dates.some(d => wo(t, d)))
+    .forEach(t => out.push(`<li><span class="hrs">${r1(statsFor(t, dates).tot)}</span><span><strong>${esc(plain(t))}</strong> <span class="note">is marked hidden in AppFolio but has labor in this range</span></span></li>`));
+  const note = DATA.clockNote;
+  if (HAS_CLOCK && note && note.noClock && note.noClock.length) {
+    const active = note.noClock.filter(t => dates.some(d => wo(t, d)));
+    if (active.length) out.push(`<li><span class="hrs">${active.length}</span><span><strong>No Timeero match</strong> <span class="note">for ${active.map(t => esc(plain(t))).join(', ')}. If they use Timeero under a different name, add them to tech_names.json in GitHub.</span></span></li>`);
+  }
+  $('flags').innerHTML = out.length ? out.join('') : '<li class="empty">Nothing stands out in this range.</li>';
 }
 
 function renderDetail(dates) {
   const el = $('detail');
-  if (!state.sel || !byTech[state.sel]) { el.hidden = true; return; }
+  if (!state.sel || !allTechs.includes(state.sel)) { el.hidden = true; return; }
   const t = state.sel, s = statsFor(t, dates), name = plain(t);
-  const peak = Math.max(state.thr, s.max, 1);
+  const peak = Math.max(state.thr, s.max, ...dates.map(d => (ck(t, d) || { c: 0 }).c), 1);
   const bars = dates.map(d => {
-    const c = byTech[t][d], v = c ? c.h : 0;
+    const c = wo(t, d), k = ck(t, d), v = c ? c.h : 0, cl = k ? k.c : 0;
     const cls = v > WAY_OVER ? 'way' : (v > state.thr ? 'over' : '');
-    return `<div class="dbar ${cls}" data-t="${esc(t)}" data-d="${d}" title="${fmtLong(d)}: ${r1(v)} hrs${c ? `, ${entriesWord(c.e)}` : ''}"><span style="height:${(v / peak) * 100}%"></span><em>${+d.slice(8)}</em></div>`;
+    return `<div class="dbar ${cls}" data-t="${esc(t)}" data-d="${d}" title="${fmtLong(d)}: ${r1(v)} work order hrs${HAS_CLOCK ? `, ${r1(cl)} clocked` : ''}">
+      ${HAS_CLOCK && cl ? `<i class="clk" style="height:${(cl / peak) * 100}%"></i>` : ''}<span style="height:${(v / peak) * 100}%"></span><em>${+d.slice(8)}</em></div>`;
   }).join('');
   el.innerHTML = `<div class="detail-top"><h2>${esc(name)}</h2><button class="close" data-close="sel">Close</button></div>
     <div class="dstats">
-      <span><b>${r1(s.tot)}</b>hours</span>
-      <span><b>${s.days}</b>days worked</span>
-      <span><b>${r1(s.avg)}</b>avg per day worked</span>
+      <span><b>${r1(s.tot)}</b>work order hours</span>
+      ${HAS_CLOCK ? `<span><b>${s.clk ? r1(s.clk) : '—'}</b>clocked</span><span><b>${s.pct == null ? '—' : pctTxt(s.pct)}</b>of clocked time logged</span>` : ''}
+      <span><b>${s.days}</b>days with work order time</span>
       <span><b>${s.ent ? r1(s.tot / s.ent) : '0.0'}</b>hours per labor entry</span>
       <span><b>${r1(s.max)}</b>longest day${s.maxD ? ` (${fmtShort(s.maxD)})` : ''}</span>
     </div>
-    <div class="dbars" role="img" aria-label="Daily hours for ${esc(name)}. Click a day to see its work orders.">${bars}</div>`;
+    <div class="dbars" role="img" aria-label="Daily hours for ${esc(name)}. Click a day to see its work orders.">${bars}</div>
+    ${HAS_CLOCK ? '<p class="dnote">Solid bars are work order hours; the outline behind each is clocked time.</p>' : ''}`;
   el.hidden = false;
+}
+
+function timeline(shifts, entries) {
+  const spans = [...shifts.map(x => [toMin(x.s), toMin(x.e) ?? (x.open ? toMin(x.s) + x.c * 60 : null)]),
+                 ...entries.map(x => [toMin(x.s), toMin(x.e)])].filter(([a, b]) => a != null && b != null && b > a);
+  if (!spans.length) return '';
+  const lo = Math.floor(Math.min(...spans.map(s => s[0])) / 60) * 60, hi = Math.ceil(Math.max(...spans.map(s => s[1])) / 60) * 60;
+  const w = Math.max(hi - lo, 60), pos = m => ((m - lo) / w) * 100;
+  const band = (a, b, cls, tip) => a == null || b == null || b <= a ? '' : `<i class="${cls}" style="left:${pos(a)}%;width:${Math.max(pos(b) - pos(a), 0.6)}%" title="${esc(tip)}"></i>`;
+  const sh = shifts.map(x => band(toMin(x.s), toMin(x.e) ?? toMin(x.s) + x.c * 60, 'tl-shift', `Clocked ${x.s} to ${x.e || 'still in'}`)).join('');
+  const en = entries.map(x => band(toMin(x.s), toMin(x.e), 'tl-wo' + (x.ov ? ' ov' : ''), `#${x.wo} ${x.s} to ${x.e}`)).join('');
+  let ticks = '';
+  for (let m = lo; m <= hi; m += (w > 600 ? 120 : 60)) ticks += `<span style="left:${pos(m)}%">${minLabel(m)}</span>`;
+  return `<div class="tl" role="img" aria-label="Timeline of clocked shifts and work order entries">
+    ${HAS_CLOCK ? `<div class="tl-row"><span class="tl-lbl">Clocked</span><div class="tl-track">${sh}</div></div>` : ''}
+    <div class="tl-row"><span class="tl-lbl">Work orders</span><div class="tl-track">${en}</div></div>
+    <div class="tl-row"><span class="tl-lbl"></span><div class="tl-axis">${ticks}</div></div></div>`;
 }
 
 function renderDay() {
   const el = $('day'), p = state.pick;
-  const c = p && byTech[p.t] && byTech[p.t][p.d];
-  if (!c) { el.hidden = true; return; }
-  const rows = c.list.map(x => {
-    const wo = x.wo ? (x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">#${esc(x.wo)}</a>` : `#${esc(x.wo)}`) : '<span class="sub">No work order</span>';
+  const c = p && wo(p.t, p.d), k = p && ck(p.t, p.d);
+  if (!c && !k) { el.hidden = true; return; }
+  const entries = c ? c.list : [], shifts = k ? k.list : [];
+  const woH = c ? c.h : 0, clH = k ? k.c : 0;
+  let meta = `${r1(woH)} work order hours across ${entriesWord(entries.length)}`;
+  if (HAS_CLOCK) {
+    meta += clH ? `, ${r1(clH)} hours clocked in Timeero (${pctTxt(woH / clH * 100)} logged${woH < clH ? `, ${r1(clH - woH)} unlogged` : ''}).` : '. Not clocked in to Timeero this day.';
+  } else meta += '.';
+  if (c && c.ov) meta += ` ${c.ov} entries have overlapping times, which usually means double-counted hours.`;
+  const woRows = entries.map(x => {
+    const num = x.wo ? (x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">#${esc(x.wo)}</a>` : `#${esc(x.wo)}`) : '<span class="sub">No work order</span>';
     const time = x.s || x.e ? `${esc(x.s || '?')} to ${esc(x.e || '?')}` : '<span class="sub">No times</span>';
-    return `<tr class="${x.ov ? 'ov' : ''}">
-      <td>${time}${x.ov ? '<span class="ovtag">Overlaps</span>' : ''}</td>
-      <td>${wo}${x.st ? `<span class="sub">${esc(x.st)}</span>` : ''}</td>
+    return `<tr class="${x.ov ? 'ov' : ''}"><td>${time}${x.ov ? '<span class="ovtag">Overlaps</span>' : ''}</td>
+      <td>${num}${x.st ? `<span class="sub">${esc(x.st)}</span>` : ''}</td>
       <td>${esc(x.p) || '<span class="sub">No property</span>'}${x.u ? `<span class="sub">${esc(x.u)}</span>` : ''}</td>
-      <td>${esc(x.iss)}</td>
-      <td class="n">${r1(x.h)}</td></tr>`;
+      <td>${esc(x.iss)}</td><td class="n">${r1(x.h)}</td></tr>`;
   }).join('');
-  const woCount = new Set(c.list.map(x => x.wo).filter(Boolean)).size;
+  const shRows = shifts.map(x => `<tr><td>${esc(x.s)} to ${x.e ? esc(x.e) : '<span class="ovtag">Never clocked out</span>'}</td>
+      <td>${esc(x.job) || '<span class="sub">No job</span>'}${x.task ? `<span class="sub">${esc(x.task)}</span>` : ''}</td>
+      <td>${x.b ? `${x.b} min break` : ''}</td><td class="n">${r1(x.c)}</td></tr>`).join('');
   el.innerHTML = `<div class="day-top"><h2>${esc(plain(p.t))}, ${fmtLong(p.d)}</h2><button class="close" data-close="pick">Close</button></div>
-    <p class="meta">${r1(c.h)} hours across ${entriesWord(c.e)} on ${woCount} ${woCount === 1 ? 'work order' : 'work orders'}${c.ov ? `. ${c.ov} entries have overlapping times, which usually means double-counted hours.` : '.'}</p>
-    <div class="entries"><table>
+    <p class="meta">${meta}</p>
+    ${timeline(shifts, entries)}
+    ${entries.length ? `<h3 class="dsub">Work orders</h3><div class="entries"><table>
       <thead><tr><th scope="col">Time</th><th scope="col">Work order</th><th scope="col">Property</th><th scope="col">Issue</th><th scope="col" class="n">Hours</th></tr></thead>
-      <tbody>${rows}</tbody>
-      <tfoot><tr><td colspan="4">Total</td><td class="n">${r1(c.h)}</td></tr></tfoot>
-    </table></div>`;
+      <tbody>${woRows}</tbody><tfoot><tr><td colspan="4">Total</td><td class="n">${r1(woH)}</td></tr></tfoot></table></div>` : '<p class="meta">No work order time logged this day.</p>'}
+    ${HAS_CLOCK && shifts.length ? `<h3 class="dsub">Timeero shifts</h3><div class="entries"><table>
+      <thead><tr><th scope="col">Clocked</th><th scope="col">Job</th><th scope="col">Break</th><th scope="col" class="n">Hours</th></tr></thead>
+      <tbody>${shRows}</tbody><tfoot><tr><td colspan="3">Total</td><td class="n">${r1(clH)}</td></tr></tfoot></table></div>` : ''}`;
   el.hidden = false;
 }
 
@@ -416,6 +549,8 @@ function openDay(t, d) {
   render();
   if (state.pick) $('day').scrollIntoView({ block: 'nearest', behavior: smooth() });
 }
+if (!HAS_CLOCK) $('view').hidden = true;
+$('view').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.view = b.dataset.v; render(); } });
 $('range').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.range = Math.min(+b.dataset.r, allDates.length); state.from = state.to = null; render(); } });
 ['from', 'to'].forEach(id => {
   const el = $(id); el.min = DATA.first; el.max = DATA.last;
@@ -444,8 +579,8 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.pick) { state.pick = null; render(); } });
 
-$('sub').textContent = `Labor hours logged against AppFolio work orders, by technician and day. Updated ${DATA.generated}; today is still in progress.`;
-$('foot').textContent = 'Hours are the worked-hours value on each work order labor entry in AppFolio, summed per technician per day. Click a name to see that tech\'s days, or click a day to see the work orders behind it.';
+$('sub').textContent = `Work order labor from AppFolio${HAS_CLOCK ? ', compared with time clocked in Timeero' : ''}, by technician and day. Updated ${DATA.generated}; today is still in progress.`;
+$('foot').textContent = 'Work order hours are the worked-hours value on each AppFolio labor entry.' + (HAS_CLOCK ? ' Clocked hours are Timeero shifts after breaks, matched to AppFolio techs by name.' : '') + ' Click a name to see that tech\'s days, or click a day to see what\'s behind it.';
 render();
 </script>
 </body>
