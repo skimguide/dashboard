@@ -178,6 +178,10 @@ footer{margin-top:28px;color:var(--muted);font-size:13px;max-width:80ch}
 .tl-axis span{position:absolute;transform:translateX(-50%)}
 .entries tfoot td{text-align:left}
 .entries tfoot td.n{text-align:right}
+.sortbtn{all:unset;cursor:pointer;white-space:nowrap}
+.sortbtn:hover{color:var(--ink);text-decoration:underline}
+.sortbtn.on{color:var(--ink);font-weight:600}
+.sortbtn:focus-visible{outline:2px solid var(--flag);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -210,6 +214,9 @@ footer{margin-top:28px;color:var(--muted);font-size:13px;max-width:80ch}
     <label>Sort by
       <select id="sort">
         <option value="total">Highest first</option>
+        <option value="wo">Work order hours</option>
+        <option value="clk" data-clock>Clocked hours</option>
+        <option value="pct" data-clock>% logged</option>
         <option value="avg">Avg per day worked</option>
         <option value="name">Name</option>
       </select>
@@ -278,7 +285,7 @@ const wo = (t, d) => (byTech[t] && byTech[t][d]) || null;
 const ck = (t, d) => (clockBy[t] && clockBy[t][d]) || null;
 
 /* ---------- state ---------- */
-const state = { range: Math.min(14, allDates.length), from: null, to: null, view: 'wo', sort: 'total', hideWk: false, thr: 12, sel: null, pick: null };
+const state = { range: Math.min(14, allDates.length), from: null, to: null, view: 'wo', sort: 'total', dir: 1, hideWk: false, thr: 12, sel: null, pick: null };
 
 function rangeDates() {
   if (state.from || state.to) {
@@ -312,17 +319,27 @@ function pbin(p) {
   return 'p4';
 }
 
+/* ---------- sortable column headers ---------- */
+function sortTh(k, label) {
+  const on = state.sort === k || (state.sort === 'total' && k === ({ clock: 'clk', pct: 'pct' }[state.view] || 'wo'));
+  const arrow = on ? (state.dir === 1 ? ' ▼' : ' ▲') : '';
+  return `<th scope="col" class="sumh" aria-sort="${on ? (state.dir === 1 ? 'descending' : 'ascending') : 'none'}"><button class="sortbtn${on ? ' on' : ''}" data-sort="${k}" title="Sort by ${label}">${label}${arrow}</button></th>`;
+}
+
 /* ---------- render ---------- */
 function render() {
   const dates = visibleDates();
   const techs = allTechs.map(t => ({ t, s: statsFor(t, dates) })).filter(x => x.s.ent > 0 || x.s.clk > 0);
-  const key = state.view === 'clock' ? 'clk' : (state.view === 'pct' ? 'pct' : 'tot');
+  const key = { total: state.view === 'clock' ? 'clk' : (state.view === 'pct' ? 'pct' : 'tot'), wo: 'tot', clk: 'clk', pct: 'pct', avg: 'avg' }[state.sort];
   techs.sort((a, b) => {
     if (a.t === 'Unassigned') return 1;
     if (b.t === 'Unassigned') return -1;
-    if (state.sort === 'name') return a.t.localeCompare(b.t);
-    if (state.sort === 'avg') return b.s.avg - a.s.avg;
-    return (b.s[key] ?? -1) - (a.s[key] ?? -1);
+    if (state.sort === 'name') return -state.dir * plain(a.t).localeCompare(plain(b.t));
+    const va = key === 'clk' && !a.s.clk ? null : a.s[key], vb = key === 'clk' && !b.s.clk ? null : b.s[key];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;          // techs with no Timeero time always sort last
+    if (vb == null) return -1;
+    return state.dir * (vb - va);
   });
 
   const dayWo = {}, dayClk = {}, dayWoOnClk = {};
@@ -361,8 +378,8 @@ function render() {
       <span class="dw">${'SMTWTFS'[dow(d)]}</span><span class="dn">${+d.slice(8)}</span></th>`;
   });
   h += HAS_CLOCK
-    ? '<th scope="col" class="sumh">WO hrs</th><th scope="col" class="sumh">Clocked</th><th scope="col" class="sumh">Logged</th></tr></thead><tbody>'
-    : '<th scope="col" class="sumh">Total</th><th scope="col" class="sumh">Days</th><th scope="col" class="sumh">Avg/day</th></tr></thead><tbody>';
+    ? sortTh('wo', 'WO hrs') + sortTh('clk', 'Clocked') + sortTh('pct', 'Logged') + '</tr></thead><tbody>'
+    : sortTh('wo', 'Total') + '<th scope="col" class="sumh">Days</th>' + sortTh('avg', 'Avg/day') + '</tr></thead><tbody>';
 
   techs.forEach(x => {
     const hidden = x.t.includes('(Hidden)'), name = plain(x.t);
@@ -563,7 +580,15 @@ $('range').addEventListener('click', e => { const b = e.target.closest('button')
   });
 });
 $('wk').addEventListener('change', e => { state.hideWk = e.target.checked; render(); });
-$('sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
+$('sort').addEventListener('change', e => { state.sort = e.target.value; state.dir = state.sort === 'name' ? -1 : 1; render(); });
+if (!HAS_CLOCK) document.querySelectorAll('#sort [data-clock]').forEach(o => o.remove());
+$('grid').addEventListener('click', e => {
+  const b = e.target.closest('.sortbtn'); if (!b) return;
+  e.stopPropagation();
+  const k = b.dataset.sort;
+  if (b.classList.contains('on')) state.dir = -state.dir; else { state.sort = k; state.dir = 1; }
+  state.sort = k; $('sort').value = k; render();
+});
 $('thr').addEventListener('input', e => { const v = parseFloat(e.target.value); if (!isNaN(v) && v > 0) { state.thr = v; render(); } });
 document.addEventListener('click', e => {
   const close = e.target.closest('[data-close]');
