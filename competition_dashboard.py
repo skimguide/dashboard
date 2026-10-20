@@ -61,7 +61,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-09 competition v12 (Colin Ward to Vanessa Reed)"
+VERSION = "2026-10-20 competition v13 (more office creators)"
 HERE = Path(__file__).resolve().parent
 WO_TEMPLATE = HERE / "workordercomp_template.html"
 RN_TEMPLATE = HERE / "renewalcomp_template.html"
@@ -79,7 +79,9 @@ EMERGENCY_TEXT = "emergency call"
 # sometimes get assigned work orders or log hours themselves.
 CREATOR_ALWAYS_COUNTS = [
     "Alice Hazelton", "Joe Herauf", "Nikki Ewing-Erdman", "Dotty Nuetzmann",
-    "Khaled Al Ashor", "Adriana Amaris", "Shelby Astudillo",
+    "Khaled Al Ashor", "Adriana Amaris", "Shelby Astudillo", "Dominic Montello",
+    "Isabel Tamayo", "Julian Mora", "LJ Burns", "Colin Ward", "Kathleen Garcia",
+    "Shyanne Shoffner", "Cristi Amble", "Jeramy Hove",
 ]
 UNIT_TURN_POINTS = 3
 
