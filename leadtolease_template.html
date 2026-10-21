@@ -56,6 +56,9 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 
 .utable td.chg{white-space:normal;color:var(--muted)}
 .vtag{font-size:12px;padding:1px 6px;border-radius:4px;background:var(--sel);margin-left:6px;white-space:nowrap}
+.vtag.unrented{background:var(--alertbg);color:var(--alert)}
+.vtag.rented{background:var(--bg);color:var(--ok);border:1px solid var(--line)}
+.utable td{white-space:nowrap}
 label.check{display:inline-flex;gap:8px;align-items:center;font-size:15px;cursor:pointer}
 input[type=search]{font:inherit;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:220px}
 .range{color:var(--muted);font-size:14px;margin:0 0 4px}
@@ -397,19 +400,35 @@ function bookedHtml(p){
 const dayBefore = iso => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); };
 function unitRents(p, idx){
   const from = DATA.weeks[idx[0]][0], to = DATA.weeks[idx[idx.length - 1]][1];
-  const vac = new Set(p.vacant_units || []);
-  const rows = (p.units || []).map(u => {
+  // Units on the vacancy list (vacant or on notice), with status and move dates
+  const vac = new Map((p.vacant_units || []).map(v => typeof v === "string" ? [v, {u: v}] : [v.u, v]));
+  const byUnit = new Map((p.units || []).map(u => [u.u, u]));
+  const names = new Set([...byUnit.keys(), ...vac.keys()]);
+  const rows = [...names].map(n => {
+    const u = byUnit.get(n) || {u: n, start: null, changes: []};
     const changes = u.changes.filter(([d]) => d >= from && d <= to);
-    return {u, changes, start: unitRentAt(u, dayBefore(from)), end: unitRentAt(u, to), vac: vac.has(u.u)};
-  }).filter(x => x.changes.length || x.vac);
+    return {u, changes, start: unitRentAt(u, dayBefore(from)), end: unitRentAt(u, to), v: vac.get(n)};
+  }).filter(x => x.changes.length || x.v);
   if (!rows.length) return `<div><h3>Advertised rent by unit</h3><p class="sub" style="font-size:14px">No rent changes in this range and no vacant units.</p></div>`;
-  rows.sort((a, b) => b.vac - a.vac || a.u.u.localeCompare(b.u.u, undefined, {numeric: true}));
-  const body = rows.map(x => `<tr><td>${esc(x.u.u)}${x.vac ? `<span class="vtag">Vacant now</span>` : ""}</td>
+  // Unrented vacancies first (they need leasing), then rented, then units with rent changes only
+  const rank = x => !x.v ? 3 : /unrented/i.test(x.v.status || "") ? 0 : /rented/i.test(x.v.status || "") ? 1 : 2;
+  rows.sort((a, b) => rank(a) - rank(b) || a.u.u.localeCompare(b.u.u, undefined, {numeric: true}));
+  const today = DATA.today;
+  const tag = v => {
+    if (!v) return "";
+    const st = v.status || "Vacant";
+    const notice = /notice/i.test(st), rented = /(^|-)rented/i.test(st) && !/unrented/i.test(st);
+    return `<span class="vtag ${rented ? "rented" : "unrented"}">${notice ? "On notice" : "Vacant"}, ${rented ? "rented" : "unrented"}</span>`;
+  };
+  const when = (d, future, past) => d ? `${d > today ? future : past} ${fmtDate(d)}` : "–";
+  const body = rows.map(x => `<tr><td>${esc(x.u.u)}${tag(x.v)}</td>
+      <td>${x.v ? when(x.v.out, "Moving out", "Moved out") : ""}</td>
+      <td>${x.v ? (x.v.in ? when(x.v.in, "Moving in", "Moved in") : `<span class="zero">None yet</span>`) : ""}</td>
       <td class="n">${money(x.start)}</td><td class="n">${money(x.end)}</td>
       <td class="chg">${x.changes.length ? x.changes.map(([d, r]) => `${fmtDate(d)}: ${money(r)}`).join(", ") : "No change"}</td></tr>`).join("");
   return `<div><h3>Advertised rent by unit</h3>
-    <p class="sub" style="font-size:14px;margin-bottom:6px">Units whose rent changed between ${fmtDate(from)} and ${fmtDate(to)}, and units vacant now.</p>
-    <div class="tablewrap" style="border:0"><table class="utable"><thead><tr><th>Unit</th><th class="n">At start</th><th class="n">At end</th><th>Changes in range</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+    <p class="sub" style="font-size:14px;margin-bottom:6px">Units vacant or on notice now, with their move-out and next move-in, and any other unit whose rent changed between ${fmtDate(from)} and ${fmtDate(to)}.</p>
+    <div class="tablewrap" style="border:0"><table class="utable"><thead><tr><th>Unit</th><th>Move-out</th><th>Next move-in</th><th class="n">Rent at start</th><th class="n">Rent at end</th><th>Rent changes in range</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
 }
 
 function renderRules(){

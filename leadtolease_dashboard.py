@@ -65,7 +65,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-15 lead to lease v9 (rent changes by time, lead sources by week)"
+VERSION = "2026-10-20 lead to lease v10 (move-out and move-in by unit)"
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "leadtolease_template.html"
 AGENTS_CSV = HERE / "leasing_agents.csv"      # optional: name,leasing_id rows the report misses
@@ -97,6 +97,9 @@ FIELDS = {
     "unit_status": ["unit_status", "status"],
     "short_name":  ["property_name", "name"],
     "unit":        ["unit", "unit_name"],
+    "move_out":    ["last_move_out", "move_out"],
+    "move_in":     ["next_move_in", "move_in"],
+    "ready_on":    ["ready_for_showing_on", "available_on"],
     "unit_id":     ["unit_id"],
     "rent":        ["advertised_rent_with_no_lease_term", "advertised_rent"],
     "approved":    ["advertised_rents_approved_at", "approved_at"],
@@ -420,7 +423,11 @@ def build(c, today):
             unmatched["vacant"] += 1
             continue
         counts[pid]["vacant"] += 1
-        counts[pid]["vacant_units"].append(norm(pick(r, FIELDS["unit"])))
+        # Status (Vacant/Notice, Rented/Unrented), move-out and next move-in for each unit,
+        # so the rent table shows which units are leased and which are still occupied
+        d = lambda k: (to_date(pick(r, FIELDS[k])) or "") and to_date(pick(r, FIELDS[k])).isoformat()
+        counts[pid]["vacant_units"].append({"u": norm(pick(r, FIELDS["unit"])), "status": norm(pick(r, FIELDS["unit_status"])),
+                                            "out": d("move_out"), "in": d("move_in"), "ready": d("ready_on")})
         if "unrented" in norm(pick(r, FIELDS["unit_status"])).lower():
             counts[pid]["unrented"] += 1
 
@@ -435,7 +442,7 @@ def build(c, today):
         k = counts[pid]
         out_props.append({"id": pid, "name": p["name"], "vacant": k["vacant"], "unrented": k["unrented"],
                           "leads": k["leads"], "showings": k["showings"], "apps": k["apps"], "leases": k["leases"],
-                          "sources": k["sources"], "vacant_units": sorted(k["vacant_units"]),
+                          "sources": k["sources"], "vacant_units": sorted(k["vacant_units"], key=lambda v: v["u"]),
                           "rent": rents.get(pid, {}).get("avg", [None] * len(weeks)),
                           "units": rents.get(pid, {}).get("units", [])})
     out_props.sort(key=lambda p: p["name"].lower())
