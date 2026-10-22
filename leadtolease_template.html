@@ -445,7 +445,11 @@ function unitRents(p, idx){
   };
   const when = (d, future, past) => d ? `${d > today ? future : past} ${fmtDate(d)}` : "–";
   const daysCell = x => !x.v ? "" : x.future ? `<span class="future" title="Moving out">${mdy(x.v.out)}</span>` : x.days != null ? `${x.days}` : "–";
-  const body = rows.map(x => `<tr><td>${esc(x.u.u)}${tag(x.v)}</td>
+  const unitLink = x => {
+    const id = x.u.id || (x.v && x.v.id);
+    return id ? `<a href="${esc(DATA.base_url)}properties/${encodeURIComponent(p.id)}/units/${encodeURIComponent(id)}" target="_blank" rel="noopener">${esc(x.u.u)}</a>` : esc(x.u.u);
+  };
+  const body = rows.map(x => `<tr><td>${unitLink(x)}${tag(x.v)}</td>
       <td class="n">${daysCell(x)}</td>
       <td>${x.v ? (x.v.in ? when(x.v.in, "Moving in", "Moved in") : `<span class="zero">None yet</span>`) : ""}</td>
       <td class="n">${money(x.start)}</td><td class="n">${money(x.end)}</td>

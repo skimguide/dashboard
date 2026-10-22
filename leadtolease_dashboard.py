@@ -65,7 +65,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-21 lead to lease v11 (days vacant by unit)"
+VERSION = "2026-10-21 lead to lease v12 (unit links)"
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "leadtolease_template.html"
 AGENTS_CSV = HERE / "leasing_agents.csv"      # optional: name,leasing_id rows the report misses
@@ -434,7 +434,8 @@ def build(c, today):
         # Status (Vacant/Notice, Rented/Unrented), move-out and next move-in for each unit,
         # so the rent table shows which units are leased and which are still occupied
         d = lambda k: (to_date(pick(r, FIELDS[k])) or "") and to_date(pick(r, FIELDS[k])).isoformat()
-        counts[pid]["vacant_units"].append({"u": norm(pick(r, FIELDS["unit"])), "status": norm(pick(r, FIELDS["unit_status"])),
+        counts[pid]["vacant_units"].append({"u": norm(pick(r, FIELDS["unit"])), "id": str(pick(r, FIELDS["unit_id"]) or "").removesuffix(".0"),
+                                            "status": norm(pick(r, FIELDS["unit_status"])),
                                             "out": d("move_out"), "in": d("move_in"), "ready": d("ready_on"),
                                             "days": days_vacant(pick(r, FIELDS["days_vacant"]))})
         if "unrented" in norm(pick(r, FIELDS["unit_status"])).lower():
@@ -497,7 +498,8 @@ def rent_history(c, props, weeks):
         if not pid or rent <= 0 or not a:
             continue
         uid = str(pick(r, FIELDS["unit_id"]) or pick(r, FIELDS["unit"]))
-        by_unit.setdefault((pid, uid), {"unit": norm(pick(r, FIELDS["unit"])), "recs": []})["recs"].append(
+        by_unit.setdefault((pid, uid), {"unit": norm(pick(r, FIELDS["unit"])), "id": str(pick(r, FIELDS["unit_id"]) or "").removesuffix(".0"),
+                                        "recs": []})["recs"].append(
             (a, to_dt(pick(r, FIELDS["expired"])), rent))
     out = {}
     end_of = lambda d: datetime(d.year, d.month, d.day, 23, 59, 59, tzinfo=TZ)
@@ -530,7 +532,7 @@ def rent_history(c, props, weeks):
                 hist.append([d.isoformat(), v])
                 prev = v
         if hist or start is not None:
-            p["units"].append({"u": u["unit"] or "(no unit)", "start": start, "changes": hist})
+            p["units"].append({"u": u["unit"] or "(no unit)", "id": u["id"], "start": start, "changes": hist})
     for p in out.values():
         p["avg"] = [round(s / n) if n else None for s, n in p["sums"]]
         p["units"].sort(key=lambda x: x["u"])
