@@ -65,7 +65,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-20 lead to lease v10 (move-out and move-in by unit)"
+VERSION = "2026-10-21 lead to lease v11 (days vacant by unit)"
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "leadtolease_template.html"
 AGENTS_CSV = HERE / "leasing_agents.csv"      # optional: name,leasing_id rows the report misses
@@ -98,6 +98,7 @@ FIELDS = {
     "short_name":  ["property_name", "name"],
     "unit":        ["unit", "unit_name"],
     "move_out":    ["last_move_out", "move_out"],
+    "days_vacant": ["days_vacant"],
     "move_in":     ["next_move_in", "move_in"],
     "ready_on":    ["ready_for_showing_on", "available_on"],
     "unit_id":     ["unit_id"],
@@ -236,6 +237,13 @@ def to_date(v):
         y = int(m[3])
         return date(y + 2000 if y < 100 else y, int(m[1]), int(m[2]))
     return None
+
+
+def days_vacant(v):
+    try:
+        return int(float(str(v).replace(",", "")))
+    except ValueError:
+        return None
 
 
 def to_dt(v):
@@ -427,7 +435,8 @@ def build(c, today):
         # so the rent table shows which units are leased and which are still occupied
         d = lambda k: (to_date(pick(r, FIELDS[k])) or "") and to_date(pick(r, FIELDS[k])).isoformat()
         counts[pid]["vacant_units"].append({"u": norm(pick(r, FIELDS["unit"])), "status": norm(pick(r, FIELDS["unit_status"])),
-                                            "out": d("move_out"), "in": d("move_in"), "ready": d("ready_on")})
+                                            "out": d("move_out"), "in": d("move_in"), "ready": d("ready_on"),
+                                            "days": days_vacant(pick(r, FIELDS["days_vacant"]))})
         if "unrented" in norm(pick(r, FIELDS["unit_status"])).lower():
             counts[pid]["unrented"] += 1
 

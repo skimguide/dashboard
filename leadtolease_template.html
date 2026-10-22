@@ -59,6 +59,14 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 .vtag.unrented{background:var(--alertbg);color:var(--alert)}
 .vtag.rented{background:var(--bg);color:var(--ok);border:1px solid var(--line)}
 .utable td{white-space:nowrap}
+.utable th{padding:0}
+.utable th button{all:unset;cursor:pointer;display:block;padding:7px 10px}
+.utable th button:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.utable th button[data-dir]::after{content:" ▾";font-size:12px}
+.utable th button[data-dir="asc"]::after{content:" ▴"}
+.utable th:last-child{padding:7px 10px;vertical-align:middle}
+.utable th{vertical-align:middle}
+.utable .future{background:#FFE58A;color:#3A2E00;padding:1px 6px;border-radius:4px;font-weight:600}
 label.check{display:inline-flex;gap:8px;align-items:center;font-size:15px;cursor:pointer}
 input[type=search]{font:inherit;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:220px}
 .range{color:var(--muted);font-size:14px;margin:0 0 4px}
@@ -226,6 +234,7 @@ const PLAYBOOK = {
   ]},
 };
 
+let uSort = {k: "days", dir: "desc"};
 let state = {period: "last", from: "", to: "", vacOnly: true, q: "", sort: "attn", dir: "desc", open: new Set(), focus: null, group: null};
 
 /* Quick ranges set the From and To dates; any dates can be typed in */
@@ -410,10 +419,24 @@ function unitRents(p, idx){
     return {u, changes, start: unitRentAt(u, dayBefore(from)), end: unitRentAt(u, to), v: vac.get(n)};
   }).filter(x => x.changes.length || x.v);
   if (!rows.length) return `<div><h3>Advertised rent by unit</h3><p class="sub" style="font-size:14px">No rent changes in this range and no vacant units.</p></div>`;
-  // Unrented vacancies first (they need leasing), then rented, then units with rent changes only
-  const rank = x => !x.v ? 3 : /unrented/i.test(x.v.status || "") ? 0 : /rented/i.test(x.v.status || "") ? 1 : 2;
-  rows.sort((a, b) => rank(a) - rank(b) || a.u.u.localeCompare(b.u.u, undefined, {numeric: true}));
   const today = DATA.today;
+  const mdy = iso => `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice(2, 4)}`;
+  const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 86400000);
+  // Days vacant from AppFolio (or from the move-out date). Units still occupied sort below every
+  // vacant unit, soonest move-out first; units not on the vacancy list sort last.
+  rows.forEach(x => {
+    const v = x.v;
+    x.future = !!(v && v.out && v.out > today);
+    x.days = !v ? null : x.future ? null : (v.days != null ? v.days : v.out ? daysBetween(v.out, today) : null);
+    x.dk = !v ? -1e9 : x.future ? -daysBetween(today, v.out) : (x.days ?? 0);
+  });
+  const key = {unit: x => x.u.u, days: x => x.dk, movein: x => (x.v && x.v.in) || "9999", start: x => x.start ?? -1, end: x => x.end ?? -1}[uSort.k];
+  const dir = uSort.dir === "asc" ? 1 : -1;
+  rows.sort((a, b) => {
+    const A = key(a), B = key(b);
+    const c = typeof A === "string" ? A.localeCompare(B, undefined, {numeric: true}) : A - B;
+    return c * dir || a.u.u.localeCompare(b.u.u, undefined, {numeric: true});
+  });
   const tag = v => {
     if (!v) return "";
     const st = v.status || "Vacant";
@@ -421,14 +444,16 @@ function unitRents(p, idx){
     return `<span class="vtag ${rented ? "rented" : "unrented"}">${notice ? "On notice" : "Vacant"}, ${rented ? "rented" : "unrented"}</span>`;
   };
   const when = (d, future, past) => d ? `${d > today ? future : past} ${fmtDate(d)}` : "–";
+  const daysCell = x => !x.v ? "" : x.future ? `<span class="future" title="Moving out">${mdy(x.v.out)}</span>` : x.days != null ? `${x.days}` : "–";
   const body = rows.map(x => `<tr><td>${esc(x.u.u)}${tag(x.v)}</td>
-      <td>${x.v ? when(x.v.out, "Moving out", "Moved out") : ""}</td>
+      <td class="n">${daysCell(x)}</td>
       <td>${x.v ? (x.v.in ? when(x.v.in, "Moving in", "Moved in") : `<span class="zero">None yet</span>`) : ""}</td>
       <td class="n">${money(x.start)}</td><td class="n">${money(x.end)}</td>
       <td class="chg">${x.changes.length ? x.changes.map(([d, r]) => `${fmtDate(d)}: ${money(r)}`).join(", ") : "No change"}</td></tr>`).join("");
+  const th = (k, label, n) => `<th class="${n ? "n" : ""}"><button class="usort" data-us="${k}" ${uSort.k === k ? `data-dir="${uSort.dir}"` : ""}>${label}</button></th>`;
   return `<div><h3>Advertised rent by unit</h3>
-    <p class="sub" style="font-size:14px;margin-bottom:6px">Units vacant or on notice now, with their move-out and next move-in, and any other unit whose rent changed between ${fmtDate(from)} and ${fmtDate(to)}.</p>
-    <div class="tablewrap" style="border:0"><table class="utable"><thead><tr><th>Unit</th><th>Move-out</th><th>Next move-in</th><th class="n">Rent at start</th><th class="n">Rent at end</th><th>Rent changes in range</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+    <p class="sub" style="font-size:14px;margin-bottom:6px">Units vacant or on notice now, and any other unit whose rent changed between ${fmtDate(from)} and ${fmtDate(to)}. Units still occupied show their move-out date in yellow. Click a heading to sort.</p>
+    <div class="tablewrap" style="border:0"><table class="utable"><thead><tr>${th("unit", "Unit")}${th("days", "Days vacant", 1)}${th("movein", "Next move-in")}${th("start", "Rent at start", 1)}${th("end", "Rent at end", 1)}<th>Rent changes in range</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
 }
 
 function renderRules(){
@@ -553,6 +578,13 @@ function init(){
     if (again) again.focus();
   };
   $("#rows").addEventListener("click", e => { const tr = e.target.closest("tr.prop"); if (tr && !e.target.closest("a")) toggle(tr); });
+  // Sorting the unit rent table inside an open property
+  $("#rows").addEventListener("click", e => {
+    const b = e.target.closest("button.usort"); if (!b) return;
+    const k = b.dataset.us;
+    uSort = {k, dir: uSort.k === k ? (uSort.dir === "asc" ? "desc" : "asc") : (k === "unit" || k === "movein" ? "asc" : "desc")};
+    renderProps();
+  });
   $("#rows").addEventListener("keydown", e => {
     const tr = e.target.closest("tr.prop");
     if (tr && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); toggle(tr); }
