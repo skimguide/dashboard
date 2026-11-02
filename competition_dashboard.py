@@ -61,7 +61,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-20 competition v14 (more office creators)"
+VERSION = "2026-10-30 competition v15 (Scott Kim creator)"
 HERE = Path(__file__).resolve().parent
 WO_TEMPLATE = HERE / "workordercomp_template.html"
 RN_TEMPLATE = HERE / "renewalcomp_template.html"
@@ -82,7 +82,7 @@ CREATOR_ALWAYS_COUNTS = [
     "Khaled Al Ashor", "Adriana Amaris", "Shelby Astudillo", "Dominic Montello",
     "Isabel Tamayo", "Julian Mora", "LJ Burns", "Colin Ward", "Kathleen Garcia",
     "Shyanne Shoffner", "Cristi Amble", "Jeramy Hove", "Abbey Schaan", "Alex Barnia",
-    "Jodie Yost",
+    "Jodie Yost", "Scott Kim",
 ]
 UNIT_TURN_POINTS = 3
 
