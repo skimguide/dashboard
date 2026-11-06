@@ -12,7 +12,7 @@
 <style>
 :root{
   --bg:#EEF1F4; --surface:#FFFFFF; --ink:#1C2733; --muted:#5D6B7A; --line:#D3DAE1;
-  --accent:#1F5F8B; --bar:#9FC0DA; --ok:#2E7D4F; --flag:#E0A100; --alert:#C2412D; --sel:#FFF6D9; --alertbg:#FBE9E6;
+  --accent:#1F5F8B; --bar:#9FC0DA; --ok:#2E7D4F; --flag:#E0A100; --alert:#C2412D; --sel:#FFF6D9; --alertbg:#FBE9E6; --goodbg:#E3F3E8;
   --body:"Barlow","Segoe UI",system-ui,-apple-system,sans-serif;
   --cond:"Barlow Condensed","Arial Narrow","Segoe UI",system-ui,sans-serif;
   box-sizing:border-box;
@@ -22,12 +22,12 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#12181F; --surface:#1A222C; --ink:#E6ECF2; --muted:#93A1AF; --line:#2B3642;
-    --accent:#76AEDB; --bar:#2C5677; --ok:#6FCB94; --flag:#F0B72F; --alert:#E2654F; --sel:#3A321A; --alertbg:#3A2320;
+    --accent:#76AEDB; --bar:#2C5677; --ok:#6FCB94; --flag:#F0B72F; --alert:#E2654F; --sel:#3A321A; --alertbg:#3A2320; --goodbg:#1C3326;
   }
 }
 :root[data-theme="dark"]{
   --bg:#12181F; --surface:#1A222C; --ink:#E6ECF2; --muted:#93A1AF; --line:#2B3642;
-  --accent:#76AEDB; --bar:#2C5677; --ok:#6FCB94; --flag:#F0B72F; --alert:#E2654F; --sel:#3A321A; --alertbg:#3A2320;
+  --accent:#76AEDB; --bar:#2C5677; --ok:#6FCB94; --flag:#F0B72F; --alert:#E2654F; --sel:#3A321A; --alertbg:#3A2320; --goodbg:#1C3326;
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *,*::before,*::after{box-sizing:border-box}
@@ -66,6 +66,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 .utable th button[data-dir="asc"]::after{content:" ▴"}
 .utable th:last-child{padding:7px 10px;vertical-align:middle}
 .utable th{vertical-align:middle}
+.utable .yes{color:var(--ok);font-weight:600}
+.utable .no{color:var(--alert);font-weight:600}
 .utable .future{background:#FFE58A;color:#3A2E00;padding:1px 6px;border-radius:4px;font-weight:600}
 label.check{display:inline-flex;gap:8px;align-items:center;font-size:15px;cursor:pointer}
 input[type=search]{font:inherit;font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:220px}
@@ -108,6 +110,7 @@ tbody tr.prop.open td:first-child .caret{transform:rotate(90deg)}
 .r.bad{color:var(--alert);font-weight:600}
 .r.none{color:var(--muted)}
 .tag{display:inline-block;font-size:12.5px;font-weight:500;padding:2px 7px;border-radius:4px;background:var(--alertbg);color:var(--alert);margin:0 4px 3px 0;white-space:nowrap}
+.tag.good{background:var(--goodbg);color:var(--ok)}
 .tag.ok{background:none;color:var(--muted);padding-left:0}
 .zero{color:var(--muted)}
 
@@ -294,7 +297,19 @@ function stats(p, idx){
   const ls = ratio(L, S, T.leads_per_showing, "showings"), sx = ratio(S, X, T.showings_per_lease, "leases"), lx = ratio(L, X, T.leads_per_lease, "leases");
   if (ls.bad) flags.push("showings");
   if (sx.bad) flags.push("leases");
-  return {L, S, A, X, d, flags, ls, sx, lx};
+  // Green only when the target is actually met: enough leads for the days, and at least one
+  // showing / lease at or better than target. Too little activity to judge gets no tag.
+  const good = [];
+  if (!flags.includes("leads") && d > 0) good.push("leads");
+  if (!flags.includes("showings") && S > 0) good.push("showings");
+  if (!flags.includes("leases") && X > 0) good.push("leases");
+  return {L, S, A, X, d, flags, good, ls, sx, lx};
+}
+// Red "Low …" or green "Good …" for leads, showings and leases, in funnel order
+function statusTags(s){
+  const name = {leads: "leads", showings: "showings", leases: "leases"};
+  return ["leads", "showings", "leases"].map(k => s.flags.includes(k) ? `<span class="tag">Low ${name[k]}</span>`
+    : s.good.includes(k) ? `<span class="tag good">Good ${name[k]}</span>` : "").join("");
 }
 const ratioCell = r => {
   const cls = r.bad ? "bad" : r.v === null || r.v === Infinity ? "none" : "";
@@ -304,7 +319,7 @@ const ratioCell = r => {
 /* ---------------- Properties ---------------- */
 const COLS = [
   ["name", "Property", false], ["vacant", "Vacancies", true], ["rent", "Advertised rent", true], ["L", "Leads", true], ["S", "Showings", true], ["A", "Apps", true], ["X", "Leases", true],
-  ["ls", "Leads per showing", true], ["sx", "Showings per lease", true], ["lx", "Leads per lease", true], ["attn", "Needs attention", false],
+  ["ls", "Leads per showing", true], ["sx", "Showings per lease", true], ["lx", "Leads per lease", true], ["attn", "Status", false],
 ];
 
 function renderHead(){
@@ -361,7 +376,7 @@ function renderProps(){
       <td><span class="caret" aria-hidden="true">›</span> ${esc(p.name)}</td>
       <td class="n">${z(p.vacant)}</td>${rentCell(p, idx)}<td class="n">${z(s.L)}</td><td class="n">${z(s.S)}</td><td class="n">${z(s.A)}</td><td class="n">${z(s.X)}</td>
       ${ratioCell(s.ls)}${ratioCell(s.sx)}${ratioCell(s.lx)}
-      <td class="flags">${s.flags.length ? s.flags.map(f => `<span class="tag">${label[f]}</span>`).join("") : `<span class="tag ok">On target</span>`}</td>
+      <td class="flags">${statusTags(s)}</td>
     </tr>` + (open ? `<tr class="detail"><td colspan="${COLS.length}">${detail(p, s, idx)}</td></tr>` : "");
   }).join("");
 }
@@ -374,7 +389,7 @@ function detail(p, s, idx){
     return `<tr class="${partial ? "partial" : ""}"><td>${fmtDate(a)} – ${fmtDate(b)}${partial ? " (so far)" : ""}</td><td class="n">${money(p.rent[i])}</td>
       <td class="n">${w.L}</td><td class="n">${w.S}</td><td class="n">${w.A}</td><td class="n">${w.X}</td>
       <td class="n">${pct(w.S, w.L)}</td><td class="n">${pct(w.A, w.S)}</td><td class="n">${pct(w.X, w.A)}</td><td class="n">${pct(w.X, w.L)}</td>
-      <td>${partial ? "" : w.flags.map(f => `<span class="tag">${PLAYBOOK[f].title}</span>`).join("")}</td></tr>`;
+      <td>${partial ? "" : statusTags(w)}</td></tr>`;
   }).join("");
   const checks = s.flags.length ? s.flags.map(f => `<div class="check"><h3>${PLAYBOOK[f].title}</h3><ul>${
       PLAYBOOK[f].items.map(([h, xs]) => `<li><b>${esc(h)}:</b> ${xs.map(esc).join("; ")}</li>`).join("")}</ul></div>`).join("")
@@ -428,12 +443,14 @@ function unitRents(p, idx){
     const v = x.v;
     x.future = !!(v && v.out && v.out > today);
     x.days = !v ? null : x.future ? null : (v.days != null ? v.days : v.out ? daysBetween(v.out, today) : null);
-    x.dk = !v ? -1e9 : x.future ? -daysBetween(today, v.out) : (x.days ?? 0);
+    x.dk = !v ? null : x.future ? -daysBetween(today, v.out) : (x.days ?? 0);
   });
-  const key = {unit: x => x.u.u, days: x => x.dk, movein: x => (x.v && x.v.in) || "9999", start: x => x.start ?? -1, end: x => x.end ?? -1}[uSort.k];
+  const key = {unit: x => x.u.u, days: x => x.dk, movein: x => (x.v && x.v.in) || "9999", web: x => !x.v || x.v.web == null ? null : +x.v.web, net: x => !x.v || x.v.net == null ? null : +x.v.net, start: x => x.start ?? -1, end: x => x.end ?? -1}[uSort.k];
   const dir = uSort.dir === "asc" ? 1 : -1;
   rows.sort((a, b) => {
     const A = key(a), B = key(b);
+    // Units without the value (not on the vacancy list) stay at the bottom either way
+    if (A == null || B == null) return (A == null) - (B == null) || a.u.u.localeCompare(b.u.u, undefined, {numeric: true});
     const c = typeof A === "string" ? A.localeCompare(B, undefined, {numeric: true}) : A - B;
     return c * dir || a.u.u.localeCompare(b.u.u, undefined, {numeric: true});
   });
@@ -444,6 +461,8 @@ function unitRents(p, idx){
     return `<span class="vtag ${rented ? "rented" : "unrented"}">${notice ? "On notice" : "Vacant"}, ${rented ? "rented" : "unrented"}</span>`;
   };
   const when = (d, future, past) => d ? `${d > today ? future : past} ${fmtDate(d)}` : "–";
+  // Posted to the website / internet listings; "No" is worth a look on an unrented unit
+  const posted = (v, k) => !v || v[k] == null ? "" : v[k] ? `<span class="yes">Yes</span>` : `<span class="no">No</span>`;
   const daysCell = x => !x.v ? "" : x.future ? `<span class="future" title="Moving out">${mdy(x.v.out)}</span>` : x.days != null ? `${x.days}` : "–";
   const unitLink = x => {
     const id = x.u.id || (x.v && x.v.id);
@@ -452,12 +471,13 @@ function unitRents(p, idx){
   const body = rows.map(x => `<tr><td>${unitLink(x)}${tag(x.v)}</td>
       <td class="n">${daysCell(x)}</td>
       <td>${x.v ? (x.v.in ? when(x.v.in, "Moving in", "Moved in") : `<span class="zero">None yet</span>`) : ""}</td>
+      <td>${posted(x.v, "web")}</td><td>${posted(x.v, "net")}</td>
       <td class="n">${money(x.start)}</td><td class="n">${money(x.end)}</td>
       <td class="chg">${x.changes.length ? x.changes.map(([d, r]) => `${fmtDate(d)}: ${money(r)}`).join(", ") : "No change"}</td></tr>`).join("");
   const th = (k, label, n) => `<th class="${n ? "n" : ""}"><button class="usort" data-us="${k}" ${uSort.k === k ? `data-dir="${uSort.dir}"` : ""}>${label}</button></th>`;
   return `<div><h3>Advertised rent by unit</h3>
-    <p class="sub" style="font-size:14px;margin-bottom:6px">Units vacant or on notice now, and any other unit whose rent changed between ${fmtDate(from)} and ${fmtDate(to)}. Units still occupied show their move-out date in yellow. Click a heading to sort.</p>
-    <div class="tablewrap" style="border:0"><table class="utable"><thead><tr>${th("unit", "Unit")}${th("days", "Days vacant", 1)}${th("movein", "Next move-in")}${th("start", "Rent at start", 1)}${th("end", "Rent at end", 1)}<th>Rent changes in range</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+    <p class="sub" style="font-size:14px;margin-bottom:6px">Units vacant or on notice now, and any other unit whose rent changed between ${fmtDate(from)} and ${fmtDate(to)}. Units still occupied show their move-out date in yellow. Website and Internet show whether the unit is posted to your website and to the listing sites. Click a heading to sort.</p>
+    <div class="tablewrap" style="border:0"><table class="utable"><thead><tr>${th("unit", "Unit")}${th("days", "Days vacant", 1)}${th("movein", "Next move-in")}${th("web", "Website")}${th("net", "Internet")}${th("start", "Rent at start", 1)}${th("end", "Rent at end", 1)}<th>Rent changes in range</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
 }
 
 function renderRules(){
@@ -586,7 +606,7 @@ function init(){
   $("#rows").addEventListener("click", e => {
     const b = e.target.closest("button.usort"); if (!b) return;
     const k = b.dataset.us;
-    uSort = {k, dir: uSort.k === k ? (uSort.dir === "asc" ? "desc" : "asc") : (k === "unit" || k === "movein" ? "asc" : "desc")};
+    uSort = {k, dir: uSort.k === k ? (uSort.dir === "asc" ? "desc" : "asc") : (["unit", "movein", "web", "net"].includes(k) ? "asc" : "desc")};
     renderProps();
   });
   $("#rows").addEventListener("keydown", e => {

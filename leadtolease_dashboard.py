@@ -65,7 +65,7 @@ def _with_retry(fn):
 requests.post = _with_retry(requests.post)
 requests.get = _with_retry(requests.get)
 
-VERSION = "2026-10-21 lead to lease v12 (unit links)"
+VERSION = "2026-11-06 lead to lease v13 (posted to website/internet, good tags)"
 HERE = Path(__file__).resolve().parent
 TEMPLATE = HERE / "leadtolease_template.html"
 AGENTS_CSV = HERE / "leasing_agents.csv"      # optional: name,leasing_id rows the report misses
@@ -99,6 +99,8 @@ FIELDS = {
     "unit":        ["unit", "unit_name"],
     "move_out":    ["last_move_out", "move_out"],
     "days_vacant": ["days_vacant"],
+    "posted_web":  ["posted_to_website"],
+    "posted_net":  ["posted_to_internet"],
     "move_in":     ["next_move_in", "move_in"],
     "ready_on":    ["ready_for_showing_on", "available_on"],
     "unit_id":     ["unit_id"],
@@ -237,6 +239,12 @@ def to_date(v):
         y = int(m[3])
         return date(y + 2000 if y < 100 else y, int(m[1]), int(m[2]))
     return None
+
+
+def yes_no(v):
+    """AppFolio's Yes/No (or true/false) as True/False; None when blank."""
+    s = str(v if v is not None else "").strip().lower()
+    return True if s in ("yes", "true", "1", "y") else False if s in ("no", "false", "0", "n") else None
 
 
 def days_vacant(v):
@@ -437,7 +445,8 @@ def build(c, today):
         counts[pid]["vacant_units"].append({"u": norm(pick(r, FIELDS["unit"])), "id": str(pick(r, FIELDS["unit_id"]) or "").removesuffix(".0"),
                                             "status": norm(pick(r, FIELDS["unit_status"])),
                                             "out": d("move_out"), "in": d("move_in"), "ready": d("ready_on"),
-                                            "days": days_vacant(pick(r, FIELDS["days_vacant"]))})
+                                            "days": days_vacant(pick(r, FIELDS["days_vacant"])),
+                                            "web": yes_no(pick(r, FIELDS["posted_web"])), "net": yes_no(pick(r, FIELDS["posted_net"]))})
         if "unrented" in norm(pick(r, FIELDS["unit_status"])).lower():
             counts[pid]["unrented"] += 1
 
