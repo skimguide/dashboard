@@ -432,8 +432,8 @@ function unitRents(p, idx){
     const u = byUnit.get(n) || {u: n, start: null, changes: []};
     const changes = u.changes.filter(([d]) => d >= from && d <= to);
     return {u, changes, start: unitRentAt(u, dayBefore(from)), end: unitRentAt(u, to), v: vac.get(n)};
-  }).filter(x => x.changes.length || x.v);
-  if (!rows.length) return `<div><h3>Advertised rent by unit</h3><p class="sub" style="font-size:14px">No rent changes in this range and no vacant units.</p></div>`;
+  }).filter(x => x.v);   // only units vacant or on notice; occupied units are left out
+  if (!rows.length) return `<div><h3>Advertised rent by unit</h3><p class="sub" style="font-size:14px">No units vacant or on notice.</p></div>`;
   const today = DATA.today;
   const mdy = iso => `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice(2, 4)}`;
   const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 86400000);
@@ -476,7 +476,7 @@ function unitRents(p, idx){
       <td class="chg">${x.changes.length ? x.changes.map(([d, r]) => `${fmtDate(d)}: ${money(r)}`).join(", ") : "No change"}</td></tr>`).join("");
   const th = (k, label, n) => `<th class="${n ? "n" : ""}"><button class="usort" data-us="${k}" ${uSort.k === k ? `data-dir="${uSort.dir}"` : ""}>${label}</button></th>`;
   return `<div><h3>Advertised rent by unit</h3>
-    <p class="sub" style="font-size:14px;margin-bottom:6px">Units vacant or on notice now, and any other unit whose rent changed between ${fmtDate(from)} and ${fmtDate(to)}. Units still occupied show their move-out date in yellow. Website and Internet show whether the unit is posted to your website and to the listing sites. Click a heading to sort.</p>
+    <p class="sub" style="font-size:14px;margin-bottom:6px">Units vacant or on notice now, with rent changes between ${fmtDate(from)} and ${fmtDate(to)}. Units on notice show their move-out date in yellow. Website and Internet show whether the unit is posted to your website and to the listing sites. Click a heading to sort.</p>
     <div class="tablewrap" style="border:0"><table class="utable"><thead><tr>${th("unit", "Unit")}${th("days", "Days vacant", 1)}${th("movein", "Next move-in")}${th("web", "Website")}${th("net", "Internet")}${th("start", "Rent at start", 1)}${th("end", "Rent at end", 1)}<th>Rent changes in range</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
 }
 
